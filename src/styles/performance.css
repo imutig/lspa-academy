@@ -1,0 +1,34 @@
+/* Performance-optimized hover effects */
+.hover-optimized {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.hover-optimized:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3) !important;
+}
+
+.hover-button:hover {
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+.hover-card:hover {
+  transform: translateY(-4px) scale(1.01) !important;
+  box-shadow: 0 12px 30px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Disable complex animations on low-end devices */
+@media (prefers-reduced-motion: reduce) {
+  .hover-optimized,
+  .hover-button,
+  .hover-card {
+    transition: none !important;
+  }
+  
+  .hover-optimized:hover,
+  .hover-button:hover,
+  .hover-card:hover {
+    transform: none !important;
+  }
+}

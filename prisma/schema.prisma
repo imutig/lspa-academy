@@ -1,0 +1,266 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique // Email maintenant optionnel
+  username  String   @unique
+  firstName String?  // Temporairement optionnel pour la migration
+  lastName  String?  // Temporairement optionnel pour la migration
+  password  String
+  role      Role     @default(CANDIDAT)
+  matricule String?  @unique
+  registrationCodeId String? // Lien vers le code d'inscription utilisé
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  candidateInSessions SessionCandidate[]
+  interviewsGiven     Interview[]        @relation("InterviewerUser")
+  interviewsReceived  Interview[]        @relation("CandidateUser")
+  quizAttempts        QuizAttempt[]
+  registrationCode    RegistrationCode?  @relation(fields: [registrationCodeId], references: [id])
+
+  @@map("users")
+}
+
+model Session {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  date         DateTime?
+  location     String?
+  maxCandidates Int?
+  status       SessionStatus @default(PLANNED)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdBy    String
+
+  // Relations
+  candidates    SessionCandidate[]
+  interviews    Interview[]
+  quizAttempts  QuizAttempt[]
+  sessionQuizzes SessionQuiz[]
+
+  @@map("sessions")
+}
+
+model SessionQuiz {
+  id        String   @id @default(cuid())
+  sessionId String
+  quizId    String
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  quiz    Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, quizId])
+  @@map("session_quizzes")
+}
+
+model SessionCandidate {
+  id         String @id @default(cuid())
+  sessionId  String
+  userId     String
+  matricule  String? @unique
+  status     CandidateStatus @default(REGISTERED)
+  createdAt  DateTime @default(now())
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@map("session_candidates")
+}
+
+model Interview {
+  id           String            @id @default(cuid())
+  sessionId    String
+  candidateId  String
+  interviewerId String?          // Optionnel pour garder compatibilité
+  status       InterviewStatus   @default(SCHEDULED)
+  conductedBy  String?          // Nom de la personne qui conduit l'entretien
+  decision     InterviewDecision?
+  notes        String?
+  completedAt  DateTime?        // Date de completion
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relations
+  session      Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  candidate    User    @relation("CandidateUser", fields: [candidateId], references: [id], onDelete: Cascade)
+  interviewer  User?   @relation("InterviewerUser", fields: [interviewerId], references: [id], onDelete: Cascade)
+  
+  // Relations pour les questions et situations d'entretien
+  interviewQuestions  InterviewQuestion[]
+  interviewSituations InterviewSituation[]
+
+  @@map("interviews")
+}
+
+model Quiz {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  timeLimit   Int      @default(600) // in seconds (10 minutes default)
+  passingScoreNormal    Int @default(80)   // Passing score for normal candidates
+  passingScoreToWatch   Int @default(90)   // Passing score for "à surveiller" candidates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  questions Question[]
+  attempts  QuizAttempt[]
+  sessionQuizzes SessionQuiz[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id       String @id @default(cuid())
+  quizId   String?  // Optionnel car certaines questions peuvent être pour les entretiens
+  question String
+  category String? // Pour différencier QUIZ vs INTERVIEW
+  options  String? // JSON string of options (optionnel pour questions d'entretien)
+  correctAnswer String?
+  points   Int    @default(1)
+  order    Int?
+
+  // Relations
+  quiz Quiz? @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  interviewQuestions InterviewQuestion[]
+
+  @@map("questions")
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  quizId    String
+  userId    String
+  sessionId String
+  answers   Json     // Store answers as JSON
+  score     Int
+  maxScore  Int
+  completed Boolean  @default(false)
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+
+  // Relations
+  quiz    Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId])
+  @@map("quiz_attempts")
+}
+
+model Situation {
+  id               String   @id @default(cuid())
+  title            String
+  description      String
+  expectedBehavior String?  // Comportement attendu
+  expectedResponse String?  // Alias pour expectedBehavior
+  correctAnswer    String?  // Réponse correcte attendue
+  difficulty       String?  @default("MEDIUM")
+  category         String?
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  interviewSituations InterviewSituation[]
+
+  @@map("situations")
+}
+
+model RegistrationCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String?
+  maxUses     Int?     // null = illimité
+  currentUses Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  users User[]
+
+  @@map("registration_codes")
+}
+
+enum Role {
+  CANDIDAT
+  INSTRUCTEUR
+  SUPERVISEUR
+  DIRECTEUR
+}
+
+enum SessionStatus {
+  PLANNED
+  ACTIVE
+  CLOSED
+}
+
+enum CandidateStatus {
+  REGISTERED
+  VALIDATED
+  IN_INTERVIEW
+  INTERVIEWED
+  QUIZ_READY
+  QUIZ_COMPLETED
+  PASSED
+  FAILED
+}
+
+enum InterviewDecision {
+  FAVORABLE
+  DEFAVORABLE
+  A_SURVEILLER
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model InterviewQuestion {
+  id          String @id @default(cuid())
+  interviewId String
+  questionId  String
+  answer      String?
+  rating      Int?   @default(5)
+  
+  // Relations
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@map("interview_questions")
+}
+
+model InterviewSituation {
+  id                String @id @default(cuid())
+  interviewId       String
+  situationId       String
+  candidateResponse String?
+  evaluation        String? // 'GOOD', 'AVERAGE', 'BAD'
+  
+  // Relations
+  interview         Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  situation         Situation @relation(fields: [situationId], references: [id], onDelete: Cascade)
+  
+  @@map("interview_situations")
+}

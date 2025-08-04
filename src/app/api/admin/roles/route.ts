@@ -1,0 +1,72 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || session.user.role !== 'DIRECTEUR') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
+    }
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        matricule: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    return NextResponse.json({ users })
+  } catch (error) {
+    console.error('Erreur lors de la récupération des utilisateurs:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || session.user.role !== 'DIRECTEUR') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
+    }
+
+    const { userId, newRole } = await request.json()
+
+    if (!userId || !newRole) {
+      return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
+    }
+
+    const validRoles = ['CANDIDAT', 'INSTRUCTEUR', 'SUPERVISEUR', 'DIRECTEUR']
+    if (!validRoles.includes(newRole)) {
+      return NextResponse.json({ error: 'Rôle invalide' }, { status: 400 })
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        matricule: true,
+        createdAt: true,
+      }
+    })
+
+    return NextResponse.json({ user: updatedUser })
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du rôle:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+}

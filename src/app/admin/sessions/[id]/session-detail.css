@@ -1,0 +1,138 @@
+/* Styles spécifiques pour la page de détails de session */
+.session-detail-page {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 50%, #111827 100%);
+  min-height: 100vh;
+  color: white;
+}
+
+.session-detail-page .glass-card {
+  background: rgba(31, 41, 55, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  border-radius: 16px;
+}
+
+.session-detail-page .glass-card:hover {
+  background: rgba(31, 41, 55, 0.8);
+}
+
+.session-detail-page .candidate-card {
+  background: rgba(55, 65, 81, 0.4);
+  border: 1px solid rgba(75, 85, 99, 0.4);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.session-detail-page .candidate-card:hover {
+  background: rgba(55, 65, 81, 0.6);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.session-detail-page .input-field {
+  background: rgba(55, 65, 81, 0.6);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 8px;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.session-detail-page .input-field:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.session-detail-page .status-badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.session-detail-page .btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.session-detail-page .btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+}
+
+.session-detail-page .btn-secondary {
+  background: rgba(75, 85, 99, 0.6);
+  border: 1px solid rgba(107, 114, 128, 0.5);
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.session-detail-page .btn-secondary:hover {
+  background: rgba(75, 85, 99, 0.8);
+}
+
+.session-detail-page .search-input {
+  background: rgba(31, 41, 55, 0.6);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 12px;
+  color: white;
+  padding: 16px 16px 16px 48px;
+}
+
+.session-detail-page .search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.session-detail-page .modal-overlay {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.session-detail-page .modal-content {
+  background: rgba(31, 41, 55, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+/* Animation de chargement */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.session-detail-page .loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .session-detail-page .candidate-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .session-detail-page .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 768px) {
+  .session-detail-page .candidate-grid {
+    grid-template-columns: 80px 1fr 150px 120px 100px 120px;
+    gap: 16px;
+    align-items: center;
+  }
+  
+  .session-detail-page .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

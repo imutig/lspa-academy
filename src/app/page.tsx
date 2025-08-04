@@ -1,103 +1,274 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { data: session, status } = useSession()
+  const [isLoaded, setIsLoaded] = useState(false)
+  const router = useRouter()
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    setIsLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (session) {
+      const role = session.user?.role
+      if (role === 'DIRECTEUR' || role === 'SUPERVISEUR') {
+        router.push('/admin/dashboard')
+      } else if (role === 'INSTRUCTEUR') {
+        router.push('/instructor/dashboard')
+      } else {
+        router.push('/candidate/dashboard')
+      }
+    }
+  }, [session, router])
+
+  const features = [
+    {
+      icon: '🎓',
+      title: 'Formation d\'Excellence',
+      description: 'Programme de formation complet pour devenir policier qualifié dans l\'univers GTA RP.'
+    },
+    {
+      icon: '📋',
+      title: 'Candidatures en Ligne',
+      description: 'Processus de candidature simple et efficace avec suivi en temps réel.'
+    },
+    {
+      icon: '📊',
+      title: 'Suivi des Progrès',
+      description: 'Dashboard personnalisé pour suivre votre progression et vos résultats.'
+    },
+    {
+      icon: '🏆',
+      title: 'Certification',
+      description: 'Obtenez votre certification officielle LSPA reconnue sur GrandLineFA.'
+    }
+  ]
+
+  const stats = [
+    { number: '500+', label: 'Policiers Formés' },
+    { number: '98%', label: 'Taux de Réussite' },
+    { number: '24/7', label: 'Support Disponible' },
+    { number: '15+', label: 'Instructeurs Experts' }
+  ]
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-dark-100 to-dark-200 flex items-center justify-center">
+        <div className="spinner-lg"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0a0a0a 0%, #151515 50%, #1f1f1f 100%)',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Particles d'arrière-plan */}
+      <div style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', zIndex: 1}}>
+        <div style={{
+          position: 'absolute',
+          top: '-40px',
+          left: '-40px',
+          width: '384px',
+          height: '384px',
+          backgroundColor: '#3b82f6',
+          borderRadius: '50%',
+          mixBlendMode: 'multiply',
+          filter: 'blur(60px)',
+          opacity: 0.2,
+          animation: 'float 6s ease-in-out infinite'
+        }}></div>
+        <div style={{
+          position: 'absolute',
+          bottom: '-40px',
+          right: '-40px',
+          width: '384px',
+          height: '384px',
+          backgroundColor: '#8b5cf6',
+          borderRadius: '50%',
+          mixBlendMode: 'multiply',
+          filter: 'blur(60px)',
+          opacity: 0.2,
+          animation: 'float 6s ease-in-out infinite',
+          animationDelay: '3s'
+        }}></div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="relative z-20" style={{padding: '24px'}}>
+        <div className="max-w-7xl mx-auto flex items-center justify-between" style={{maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+          <div className="flex items-center space-x-4" style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center animate-glow" style={{width: '48px', height: '48px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+              <span className="text-white font-bold text-lg" style={{color: 'white', fontWeight: 'bold', fontSize: '18px'}}>L</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white" style={{fontSize: '24px', fontWeight: 'bold', color: 'white', margin: '0'}}>LSPA</h1>
+              <p className="text-xs text-gray-400" style={{fontSize: '12px', color: '#9ca3af', margin: '0'}}>GrandLineFA</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4" style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+            <Link href="/login" className="btn-secondary" style={{padding: '8px 16px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', textDecoration: 'none', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)'}}>
+              Se connecter
+            </Link>
+            <Link href="/register" className="btn-primary" style={{padding: '8px 16px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', textDecoration: 'none', borderRadius: '8px'}}>
+              S'inscrire
+            </Link>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </nav>
+
+      {/* Hero Section */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20" style={{position: 'relative', zIndex: 10, maxWidth: '80rem', margin: '0 auto', padding: '0 24px', paddingTop: '80px'}}>
+        <div className={`text-center transition-all duration-1000 ${
+          isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`} style={{textAlign: 'center', marginBottom: '64px'}}>
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight" style={{fontSize: 'clamp(48px, 8vw, 96px)', fontWeight: 'bold', color: 'white', marginBottom: '24px', lineHeight: 1.1}}>
+            <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent" style={{background: 'linear-gradient(to right, #60a5fa, #3b82f6, #2563eb)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>
+              Los Santos
+            </span>
+            <br />
+            <span className="text-white" style={{color: 'white'}}>Police Academy</span>
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed" style={{fontSize: 'clamp(18px, 3vw, 24px)', color: '#d1d5db', marginBottom: '32px', maxWidth: '48rem', margin: '0 auto 32px auto', lineHeight: 1.6}}>
+            Rejoignez l'élite de la police de Los Santos. Formation d'excellence, 
+            carrière prestigieuse, service public d'honneur.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16" style={{display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', alignItems: 'center', marginBottom: '64px'}}>
+            <Link href="/register" className="btn-primary px-8 py-4 text-lg" style={{padding: '16px 32px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', textDecoration: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: '500'}}>
+              🎯 Commencer ma Formation
+            </Link>
+            <Link href="/login" className="btn-secondary px-8 py-4 text-lg" style={{padding: '16px 32px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', textDecoration: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: '500', border: '1px solid rgba(59, 130, 246, 0.2)'}}>
+              📊 Accéder à mon Dashboard
+            </Link>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className={`grid grid-cols-2 md:grid-cols-4 gap-8 mb-20 transition-all duration-1000 delay-300 ${
+          isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`} style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '32px', marginBottom: '80px'}}>
+          {stats.map((stat, index) => (
+            <div 
+              key={index} 
+              className="glass rounded-2xl p-6 text-center hover:scale-105 transition-transform duration-300"
+              style={{
+                background: 'rgba(21, 21, 21, 0.8)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: '16px',
+                padding: '24px',
+                textAlign: 'center',
+                transition: 'transform 0.3s ease'
+              }}
+            >
+              <div className="text-3xl font-bold text-blue-400 mb-2" style={{fontSize: '24px', fontWeight: 'bold', color: '#60a5fa', marginBottom: '8px'}}>{stat.number}</div>
+              <div className="text-gray-300 text-sm" style={{color: '#d1d5db', fontSize: '14px'}}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Features */}
+        <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20 transition-all duration-1000 delay-500 ${
+          isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`} style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px', marginBottom: '80px'}}>
+          {features.map((feature, index) => (
+            <div 
+              key={index}
+              className="glass rounded-2xl p-8 hover:scale-105 transition-all duration-300 group"
+              style={{
+                background: 'rgba(21, 21, 21, 0.8)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: '16px',
+                padding: '32px',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300" style={{fontSize: '32px', marginBottom: '16px', transition: 'transform 0.3s ease'}}>
+                {feature.icon}
+              </div>
+              <h3 className="text-xl font-bold text-white mb-4" style={{fontSize: '20px', fontWeight: 'bold', color: 'white', marginBottom: '16px'}}>{feature.title}</h3>
+              <p className="text-gray-300 text-sm leading-relaxed" style={{color: '#d1d5db', fontSize: '14px', lineHeight: 1.6}}>{feature.description}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA Section */}
+        <div className={`glass rounded-3xl p-12 text-center mb-20 transition-all duration-1000 delay-700 ${
+          isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`} style={{
+          background: 'rgba(21, 21, 21, 0.8)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          borderRadius: '24px',
+          padding: '48px',
+          textAlign: 'center',
+          marginBottom: '80px'
+        }}>
+          <h2 className="text-4xl font-bold text-white mb-6" style={{fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '24px'}}>
+            Prêt à servir et protéger ?
+          </h2>
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto" style={{fontSize: '20px', color: '#d1d5db', marginBottom: '32px', maxWidth: '42rem', margin: '0 auto 32px auto'}}>
+            Rejoignez les rangs de la police de Los Santos et faites la différence 
+            dans l'univers GrandLineFA.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center" style={{display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', alignItems: 'center'}}>
+            <Link href="/register" className="btn-primary px-8 py-4 text-lg" style={{padding: '16px 32px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', textDecoration: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: '500'}}>
+              🚔 Devenir Policier
+            </Link>
+            <Link href="/about" className="btn-secondary px-8 py-4 text-lg" style={{padding: '16px 32px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', textDecoration: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: '500', border: '1px solid rgba(59, 130, 246, 0.2)'}}>
+              📖 En savoir plus
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="relative z-10 glass" style={{
+        position: 'relative',
+        zIndex: 10,
+        background: 'rgba(21, 21, 21, 0.8)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(59, 130, 246, 0.2)',
+        borderLeft: 'none',
+        borderRight: 'none',
+        borderBottom: 'none'
+      }}>
+        <div className="max-w-7xl mx-auto px-6 py-8" style={{maxWidth: '80rem', margin: '0 auto', padding: '32px 24px'}}>
+          <div className="flex flex-col md:flex-row justify-between items-center" style={{display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', gap: '16px'}}>
+            <div className="flex items-center space-x-4 mb-4 md:mb-0" style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center" style={{width: '40px', height: '40px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                <span className="text-white font-bold" style={{color: 'white', fontWeight: 'bold'}}>L</span>
+              </div>
+              <div>
+                <h3 className="text-white font-bold" style={{color: 'white', fontWeight: 'bold', margin: '0'}}>LSPA</h3>
+                <p className="text-gray-400 text-sm" style={{color: '#9ca3af', fontSize: '14px', margin: '0'}}>Los Santos Police Academy</p>
+              </div>
+            </div>
+            
+            <div className="text-center md:text-right" style={{textAlign: 'center'}}>
+              <p className="text-gray-400 text-sm" style={{color: '#9ca3af', fontSize: '14px', margin: '0'}}>
+                © 2025 GrandLineFA - Tous droits réservés
+              </p>
+              <p className="text-gray-500 text-xs mt-1" style={{color: '#6b7280', fontSize: '12px', marginTop: '4px'}}>
+                Formation d'excellence pour l'élite policière
+              </p>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
-  );
+  )
 }
