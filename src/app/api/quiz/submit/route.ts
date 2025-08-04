@@ -14,8 +14,50 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { quizId, answers, timeSpent, sessionId } = body
 
-    if (!quizId || !sessionId) {
-      return NextResponse.json({ error: 'Quiz ID et Session ID requis' }, { status: 400 })
+    if (!quizId) {
+      return NextResponse.json({ error: 'Quiz ID requis' }, { status: 400 })
+    }
+
+    // Vérifier que le candidat est inscrit à la session
+    if (sessionId) {
+      const sessionCandidate = await prisma.sessionCandidate.findUnique({
+        where: {
+          sessionId_userId: {
+            sessionId,
+            userId: session.user.id
+          }
+        },
+        include: {
+          session: {
+            include: {
+              interviews: {
+                where: { candidateId: session.user.id }
+              }
+            }
+          }
+        }
+      })
+
+      if (!sessionCandidate) {
+        return NextResponse.json({ error: 'Vous n\'êtes pas inscrit à cette session' }, { status: 403 })
+      }
+
+      // Vérifier que l'entretien est terminé
+      const interview = sessionCandidate.session.interviews[0]
+      if (!interview || interview.status !== 'COMPLETED') {
+        return NextResponse.json({ 
+          error: 'Vous devez terminer votre entretien avant de passer le quiz',
+          code: 'INTERVIEW_NOT_COMPLETED'
+        }, { status: 403 })
+      }
+
+      // Vérifier que la décision d'entretien n'est pas défavorable
+      if (interview.decision === 'DEFAVORABLE') {
+        return NextResponse.json({ 
+          error: 'Accès au quiz refusé suite à la décision d\'entretien',
+          code: 'INTERVIEW_UNFAVORABLE'
+        }, { status: 403 })
+      }
     }
 
     // Récupérer le quiz avec les questions
@@ -32,7 +74,8 @@ export async function POST(request: NextRequest) {
     const existingAttempt = await prisma.quizAttempt.findFirst({
       where: {
         quizId,
-        userId: session.user.id
+        userId: session.user.id,
+        completed: true
       }
     })
 
@@ -62,14 +105,32 @@ export async function POST(request: NextRequest) {
     })
 
     const scorePercentage = Math.round((earnedPoints / totalPoints) * 100)
-    const passed = scorePercentage >= quiz.passingScore
+
+    // Trouver ou créer une session pour ce candidat
+    let candidateSession = await prisma.session.findFirst({
+      where: {
+        status: 'PLANNED' // ou toute autre logique pour trouver la session appropriée
+      }
+    })
+
+    if (!candidateSession) {
+      // Créer une session par défaut si aucune n'existe
+      candidateSession = await prisma.session.create({
+        data: {
+          name: `Session Quiz ${new Date().toLocaleDateString()}`,
+          description: 'Session automatique pour quiz',
+          status: 'PLANNED',
+          createdBy: session.user.id
+        }
+      })
+    }
 
     // Sauvegarder la tentative
     const attempt = await prisma.quizAttempt.create({
       data: {
         quizId,
         userId: session.user.id,
-        sessionId: sessionId || '',
+        sessionId: candidateSession.id,
         answers: answers,
         score: earnedPoints,
         maxScore: totalPoints,
@@ -80,7 +141,8 @@ export async function POST(request: NextRequest) {
         quiz: {
           select: {
             title: true,
-            passingScore: true
+            passingScoreNormal: true,
+            passingScoreToWatch: true
           }
         }
       }

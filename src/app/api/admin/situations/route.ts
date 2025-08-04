@@ -7,10 +7,26 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['DIRECTEUR', 'SUPERVISEUR'].includes(session.user.role)) {
+    if (!session || !['DIRECTEUR', 'SUPERVISEUR', 'INSTRUCTEUR'].includes(session.user.role)) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const randomCount = searchParams.get('random')
+
+    if (randomCount) {
+      // Récupérer des situations aléatoires pour les entretiens
+      const count = parseInt(randomCount) || 3
+      const situations = await prisma.$queryRaw`
+        SELECT * FROM "Situation" 
+        WHERE "isActive" = true 
+        ORDER BY RANDOM() 
+        LIMIT ${count}
+      `
+      return NextResponse.json({ situations })
+    }
+
+    // Récupérer toutes les situations (pour l'admin)
     const situations = await prisma.situation.findMany({
       orderBy: {
         createdAt: 'desc'

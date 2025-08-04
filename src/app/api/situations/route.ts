@@ -11,6 +11,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const randomCount = searchParams.get('random')
+
+    if (randomCount) {
+      // Récupérer un nombre aléatoire de situations
+      const count = parseInt(randomCount, 10)
+      const totalSituations = await prisma.situation.count()
+      
+      if (count >= totalSituations) {
+        // Si on demande plus de situations qu'il n'y en a, retourner toutes
+        const allSituations = await prisma.situation.findMany({
+          orderBy: { createdAt: 'desc' }
+        })
+        return NextResponse.json(allSituations)
+      }
+
+      // Récupérer des situations aléatoires
+      const situations = await prisma.situation.findMany()
+      const shuffled = situations.sort(() => 0.5 - Math.random())
+      const selected = shuffled.slice(0, count)
+      
+      return NextResponse.json(selected)
+    }
+
     const situations = await prisma.situation.findMany({
       orderBy: { createdAt: 'desc' }
     })

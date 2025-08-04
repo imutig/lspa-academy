@@ -45,9 +45,11 @@ export async function GET(
       select: {
         id: true,
         candidateId: true,
+        status: true,
         decision: true,
         createdAt: true,
         updatedAt: true,
+        completedAt: true,
         interviewerId: true,
         interviewer: {
           select: {
@@ -62,27 +64,61 @@ export async function GET(
       }
     })
 
+    // Récupérer les quiz attempts pour ces candidats
+    const quizAttempts = await prisma.quizAttempt.findMany({
+      where: {
+        userId: { in: candidateIds },
+        sessionId: sessionId
+      },
+      select: {
+        id: true,
+        userId: true,
+        score: true,
+        maxScore: true,
+        startedAt: true,
+        completedAt: true,
+        completed: true,
+        answers: true
+      },
+      orderBy: {
+        startedAt: 'desc'
+      }
+    })
+
     // Formater les données pour correspondre à l'interface attendue
     const formattedCandidates = sessionCandidates.map((sc: any) => {
       const candidateInterview = interviews.find((i: any) => i.candidateId === sc.user.id)
+      const candidateQuizAttempts = quizAttempts.filter((qa: any) => qa.userId === sc.user.id)
       
       return {
         id: sc.user.id,
         firstName: sc.user.firstName || sc.user.username,
         lastName: sc.user.lastName || '',
         email: sc.user.email || '',
+        matricule: sc.matricule,
+        status: sc.status,
         phone: '', // Le champ phone n'existe pas dans le schéma
         registeredAt: sc.createdAt.toISOString(),
         interview: candidateInterview ? {
           id: candidateInterview.id,
-          status: candidateInterview.decision ? 'COMPLETED' : 'IN_PROGRESS',
-          completedAt: candidateInterview.decision ? candidateInterview.updatedAt?.toISOString() : undefined,
+          status: candidateInterview.status,
+          decision: candidateInterview.decision,
+          completedAt: candidateInterview.completedAt?.toISOString(),
           conductedBy: candidateInterview.interviewer 
             ? (candidateInterview.interviewer.firstName 
                 ? `${candidateInterview.interviewer.firstName} ${candidateInterview.interviewer.lastName}`
                 : candidateInterview.interviewer.username)
             : 'Non assigné'
-        } : undefined
+        } : undefined,
+        quizAttempts: candidateQuizAttempts.map((qa: any) => ({
+          id: qa.id,
+          score: qa.score,
+          totalQuestions: qa.maxScore, // Utiliser maxScore comme totalQuestions
+          correctAnswers: qa.score, // Utiliser score comme correctAnswers pour simplifier
+          startedAt: qa.startedAt.toISOString(),
+          completedAt: qa.completedAt?.toISOString(),
+          isInProgress: !qa.completed
+        }))
       }
     })
 

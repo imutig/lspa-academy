@@ -5,9 +5,10 @@ import { prisma } from '@/lib/prisma'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     
     if (!session || !['DIRECTEUR', 'SUPERVISEUR'].includes(session.user.role)) {
@@ -26,7 +27,7 @@ export async function PUT(
     }
 
     const situation = await prisma.situation.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: title.trim(),
         description: description.trim(),
@@ -47,9 +48,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     
     if (!session || !['DIRECTEUR', 'SUPERVISEUR'].includes(session.user.role)) {
@@ -57,7 +59,7 @@ export async function DELETE(
     }
 
     await prisma.situation.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Situation supprimée avec succès' })

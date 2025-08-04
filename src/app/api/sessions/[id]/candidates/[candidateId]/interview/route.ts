@@ -240,3 +240,65 @@ export async function DELETE(
     )
   }
 }
+
+// PATCH - Mettre à jour une décision d'entretien
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; candidateId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    const { id, candidateId } = await params
+    const { decision } = await request.json()
+
+    if (!decision || !['FAVORABLE', 'DEFAVORABLE', 'A_SURVEILLER'].includes(decision)) {
+      return NextResponse.json({ error: 'Décision invalide' }, { status: 400 })
+    }
+
+    // Trouver l'entretien existant
+    const interview = await prisma.interview.findFirst({
+      where: {
+        sessionId: id,
+        candidateId: candidateId
+      }
+    })
+
+    if (!interview) {
+      return NextResponse.json({ error: 'Entretien non trouvé' }, { status: 404 })
+    }
+
+    // Mettre à jour la décision
+    const updatedInterview = await prisma.interview.update({
+      where: { id: interview.id },
+      data: { decision }
+    })
+
+    // Mettre à jour le statut du candidat selon la décision
+    let newStatus: 'QUIZ_READY' | 'FAILED'
+    if (decision === 'FAVORABLE' || decision === 'A_SURVEILLER') {
+      newStatus = 'QUIZ_READY'
+    } else {
+      newStatus = 'FAILED'
+    }
+
+    await prisma.sessionCandidate.updateMany({
+      where: {
+        sessionId: id,
+        userId: candidateId
+      },
+      data: { status: newStatus }
+    })
+
+    return NextResponse.json(updatedInterview)
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de la décision:', error)
+    return NextResponse.json(
+      { error: 'Erreur lors de la mise à jour de la décision' },
+      { status: 500 }
+    )
+  }
+}

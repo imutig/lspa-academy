@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { modernDesign } from '../utils/modernDesign'
+import { modernDesign, createHoverEffect } from '../utils/modernDesign'
+import '../styles/quiz-buttons.css'
 
 interface Question {
   id: string
@@ -18,8 +19,8 @@ interface Quiz {
   title: string
   description: string
   timeLimit?: number
-  passingScore: number
-  isActive: boolean
+  passingScoreNormal: number
+  passingScoreToWatch: number
   questions: Question[]
   attempts?: any[]
   sessionName?: string
@@ -41,7 +42,8 @@ interface QuizAttempt {
   completedAt: string
   quiz: {
     title: string
-    passingScore: number
+    passingScoreNormal: number
+    passingScoreToWatch: number
   }
   session?: {
     name: string
@@ -62,12 +64,17 @@ export default function QuizManager() {
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [quizProgress, setQuizProgress] = useState<{[key: string]: any}>({})
+  const [isResuming, setIsResuming] = useState(false)
 
   const [newQuiz, setNewQuiz] = useState({
     title: '',
     description: '',
     timeLimit: '',
-    passingScore: '70',
+    passingScoreNormal: '80',
+    passingScoreToWatch: '90',
     questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
   })
 
@@ -75,19 +82,68 @@ export default function QuizManager() {
     fetchQuizzes()
     if (session?.user.role === 'CANDIDAT') {
       fetchAttempts()
+      loadQuizProgress()
     }
     setTimeout(() => setIsLoaded(true), 100)
   }, [session])
 
   useEffect(() => {
-    let timer: NodeJS.Timeout
+    let interval: NodeJS.Timeout
     if (timeLeft && timeLeft > 0 && activeQuiz && !showResults) {
-      timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
+      interval = setTimeout(() => {
+        const newTimeLeft = timeLeft - 1
+        setTimeLeft(newTimeLeft)
+        // Sauvegarder le progrès toutes les 10 secondes
+        if (newTimeLeft % 10 === 0) {
+          saveQuizProgress()
+        }
+      }, 1000)
     } else if (timeLeft === 0) {
       handleSubmitQuiz()
     }
-    return () => clearTimeout(timer)
+    return () => clearTimeout(interval)
   }, [timeLeft, activeQuiz, showResults])
+
+  // Sauvegarder le progrès avant de quitter la page
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (activeQuiz && !showResults && session?.user.role === 'CANDIDAT') {
+        // Sauvegarder le progrès de manière synchrone
+        navigator.sendBeacon('/api/quiz/progress', JSON.stringify({
+          quizId: activeQuiz.id,
+          currentQuestionIndex,
+          answers,
+          timeLeft,
+          startTime: quizStartTime
+        }))
+        
+        e.preventDefault()
+        e.returnValue = 'Votre progrès sera sauvegardé. Voulez-vous vraiment quitter ?'
+        return e.returnValue
+      }
+    }
+
+    const handleUnload = () => {
+      if (activeQuiz && !showResults && session?.user.role === 'CANDIDAT') {
+        // Sauvegarder le progrès de manière synchrone avant fermeture
+        navigator.sendBeacon('/api/quiz/progress', JSON.stringify({
+          quizId: activeQuiz.id,
+          currentQuestionIndex,
+          answers,
+          timeLeft,
+          startTime: quizStartTime
+        }))
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('unload', handleUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('unload', handleUnload)
+    }
+  }, [activeQuiz, showResults, session, currentQuestionIndex, answers, timeLeft, quizStartTime])
 
   const fetchQuizzes = async () => {
     try {
@@ -120,11 +176,132 @@ export default function QuizManager() {
     }
   }
 
-  const startQuiz = async (quiz: Quiz) => {
+  const loadQuizProgress = async () => {
+    if (!session?.user || session.user.role !== 'CANDIDAT') return
+    
+    try {
+      const response = await fetch('/api/quiz/progress')
+      if (response.ok) {
+        const data = await response.json()
+        // Charger les progrès depuis le serveur pour tous les quiz
+        // Cette fonction sera appelée lors du montage du composant
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des progrès:', error)
+    }
+  }
+
+  const saveQuizProgress = async () => {
+    if (!activeQuiz || !session?.user || session.user.role !== 'CANDIDAT') return
+    
+    try {
+      await fetch('/api/quiz/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quizId: activeQuiz.id,
+          currentQuestionIndex,
+          answers,
+          timeLeft,
+          startTime: quizStartTime
+        })
+      })
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du progrès:', error)
+    }
+  }
+
+  const checkQuizProgress = async (quizId: string) => {
+    if (!session?.user || session.user.role !== 'CANDIDAT') return null
+    
+    try {
+      const response = await fetch(`/api/quiz/progress?quizId=${quizId}`)
+      if (response.ok) {
+        const data = await response.json()
+        return data.hasProgress ? data : null
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du progrès:', error)
+    }
+    return null
+  }
+
+  const startQuiz = async (quiz: Quiz, forceRestart = false) => {
+    // Vérifier si le candidat a déjà complété ce quiz
+    if (session?.user.role === 'CANDIDAT' && quiz.hasAttempt) {
+      alert('Vous avez déjà passé ce quiz. Il n\'est pas possible de le recommencer.')
+      return
+    }
+
+    // Vérifier s'il y a un progrès existant (sauf si restart forcé)
+    if (!forceRestart && session?.user.role === 'CANDIDAT') {
+      const progress = await checkQuizProgress(quiz.id)
+      if (progress) {
+        // Demander si l'utilisateur veut continuer ou recommencer
+        const continueQuiz = confirm(
+          `Vous avez un quiz en cours. Voulez-vous continuer où vous vous êtes arrêté ?\n\n` +
+          `Question: ${progress.currentQuestionIndex + 1}\n` +
+          `Temps restant: ${Math.floor(progress.timeLeft / 60)}:${(progress.timeLeft % 60).toString().padStart(2, '0')}\n\n` +
+          `Cliquez "OK" pour continuer ou "Annuler" pour recommencer.`
+        )
+        
+        if (continueQuiz) {
+          return resumeQuiz(quiz, progress)
+        } else {
+          // Supprimer le progrès existant
+          await fetch(`/api/quiz/progress?quizId=${quiz.id}`, { method: 'DELETE' })
+        }
+      }
+    }
+
+    // Démarrage normal du quiz (nouveau ou restart)
+    // Optimisation : si le quiz a déjà les questions chargées, les utiliser directement
+    if (quiz.questions && Array.isArray(quiz.questions) && quiz.questions.length > 0) {
+      // Vérifier si les questions ont des options valides
+      const questionsWithValidOptions = quiz.questions.every(q => 
+        q.options && Array.isArray(q.options) && q.options.length > 0
+      )
+      
+      if (questionsWithValidOptions) {
+        console.log('Using cached quiz data for faster preview')
+        setActiveQuiz(quiz)
+        setCurrentQuestionIndex(0)
+        setAnswers({})
+        setQuizStartTime(Date.now())
+        if (quiz.timeLimit) {
+          setTimeLeft(quiz.timeLimit * 60)
+        }
+        setShowResults(false)
+        setIsResuming(false)
+        return
+      }
+    }
+
+    // Fallback : charger les questions depuis l'API
     try {
       const response = await fetch(`/api/quiz?id=${quiz.id}&includeQuestions=true`)
       if (response.ok) {
         const fullQuiz = await response.json()
+        
+        // Debug logging to understand the data structure
+        console.log('Quiz data received from API:', fullQuiz)
+        console.log('Questions:', fullQuiz.questions)
+        
+        // Validate that we have proper quiz data
+        if (!fullQuiz.questions || !Array.isArray(fullQuiz.questions) || fullQuiz.questions.length === 0) {
+          console.error('Quiz questions are missing or invalid:', fullQuiz.questions)
+          alert('Erreur: Ce quiz ne contient pas de questions valides.')
+          return
+        }
+        
+        // Validate that questions have options
+        const invalidQuestions = fullQuiz.questions.filter((q: Question) => !q.options || !Array.isArray(q.options))
+        if (invalidQuestions.length > 0) {
+          console.error('Some questions have invalid options:', invalidQuestions)
+          alert('Erreur: Certaines questions du quiz sont mal formatées.')
+          return
+        }
+        
         setActiveQuiz(fullQuiz)
         setCurrentQuestionIndex(0)
         setAnswers({})
@@ -133,18 +310,72 @@ export default function QuizManager() {
           setTimeLeft(fullQuiz.timeLimit * 60) // Convert minutes to seconds
         }
         setShowResults(false)
+        setIsResuming(false)
+      } else {
+        console.error('Failed to fetch quiz:', response.status, response.statusText)
+        alert('Erreur lors du chargement du quiz.')
       }
     } catch (error) {
       console.error('Erreur lors du démarrage du quiz:', error)
+      alert('Erreur lors du démarrage du quiz.')
+    }
+  }
+
+  const resumeQuiz = async (quiz: Quiz, progress: any) => {
+    setIsResuming(true)
+    
+    try {
+      const response = await fetch(`/api/quiz?id=${quiz.id}&includeQuestions=true`)
+      if (response.ok) {
+        const fullQuiz = await response.json()
+        
+        setActiveQuiz(fullQuiz)
+        setCurrentQuestionIndex(progress.currentQuestionIndex)
+        setAnswers(progress.answers)
+        setQuizStartTime(progress.startTime)
+        setTimeLeft(progress.timeLeft)
+        setShowResults(false)
+        setIsResuming(false)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la reprise du quiz:', error)
+      alert('Erreur lors de la reprise du quiz.')
+      setIsResuming(false)
     }
   }
 
   const handleAnswer = (questionId: string, answer: string) => {
-    setAnswers(prev => ({ ...prev, [questionId]: answer }))
+    const newAnswers = { ...answers, [questionId]: answer }
+    setAnswers(newAnswers)
+    
+    // Sauvegarder immédiatement quand une réponse est donnée
+    if (session?.user.role === 'CANDIDAT') {
+      setTimeout(() => saveQuizProgress(), 500) // Petit délai pour éviter trop d'appels
+    }
   }
 
   const handleSubmitQuiz = async () => {
     if (!activeQuiz || !quizStartTime) return
+
+    // Si c'est un admin en prévisualisation, juste afficher un résumé
+    if (session?.user.role !== 'CANDIDAT') {
+      const mockResults = {
+        summary: {
+          totalQuestions: activeQuiz.questions.length,
+          correctAnswers: Object.keys(answers).length, // Juste pour demo
+          score: 0,
+          maxScore: activeQuiz.questions.length,
+          passed: false
+        },
+        passed: false,
+        score: 0,
+        timeSpent: Math.floor((Date.now() - quizStartTime) / 1000)
+      }
+      setResults(mockResults)
+      setShowResults(true)
+      setTimeLeft(null)
+      return
+    }
 
     const timeSpent = Math.floor((Date.now() - quizStartTime) / 1000)
 
@@ -164,10 +395,20 @@ export default function QuizManager() {
         setResults(result)
         setShowResults(true)
         setTimeLeft(null)
+        
+        // Nettoyer le progrès sauvegardé
+        if (session?.user.role === 'CANDIDAT') {
+          await fetch(`/api/quiz/progress?quizId=${activeQuiz.id}`, { method: 'DELETE' })
+        }
+        
         fetchAttempts()
+      } else {
+        const errorData = await response.json()
+        alert(`Erreur lors de la soumission: ${errorData.error || 'Erreur inconnue'}`)
       }
     } catch (error) {
       console.error('Erreur lors de la soumission:', error)
+      alert('Erreur lors de la soumission du quiz.')
     }
   }
 
@@ -179,7 +420,8 @@ export default function QuizManager() {
         body: JSON.stringify({
           ...newQuiz,
           timeLimit: newQuiz.timeLimit ? parseInt(newQuiz.timeLimit) : null,
-          passingScore: parseInt(newQuiz.passingScore),
+          passingScoreNormal: parseInt(newQuiz.passingScoreNormal),
+          passingScoreToWatch: parseInt(newQuiz.passingScoreToWatch),
           questions: newQuiz.questions.map((q, index) => ({
             ...q,
             points: parseInt(q.points),
@@ -195,7 +437,8 @@ export default function QuizManager() {
           title: '',
           description: '',
           timeLimit: '',
-          passingScore: '70',
+          passingScoreNormal: '80',
+          passingScoreToWatch: '90',
           questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
         })
         fetchQuizzes()
@@ -219,6 +462,78 @@ export default function QuizManager() {
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
     }
+  }
+
+  const startEditQuiz = (quiz: Quiz) => {
+    setEditingQuiz(quiz)
+    setNewQuiz({
+      title: quiz.title,
+      description: quiz.description || '',
+      timeLimit: quiz.timeLimit?.toString() || '',
+      passingScoreNormal: quiz.passingScoreNormal.toString(),
+      passingScoreToWatch: quiz.passingScoreToWatch.toString(),
+      questions: quiz.questions?.map(q => ({
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options : ['', '', '', ''],
+        correctAnswer: q.correctAnswer.toString(),
+        points: q.points.toString()
+      })) || [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
+    })
+    setShowEditForm(true)
+    setShowCreateForm(false)
+  }
+
+  const updateQuiz = async () => {
+    if (!editingQuiz) return
+
+    try {
+      const response = await fetch(`/api/quiz?id=${editingQuiz.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newQuiz.title,
+          description: newQuiz.description,
+          timeLimit: newQuiz.timeLimit ? parseInt(newQuiz.timeLimit) : null,
+          passingScoreNormal: parseInt(newQuiz.passingScoreNormal),
+          passingScoreToWatch: parseInt(newQuiz.passingScoreToWatch),
+          questions: newQuiz.questions.map((q, index) => ({
+            ...q,
+            points: parseInt(q.points),
+            correctAnswer: parseInt(q.correctAnswer),
+            order: index
+          }))
+        })
+      })
+
+      if (response.ok) {
+        setShowEditForm(false)
+        setEditingQuiz(null)
+        setNewQuiz({
+          title: '',
+          description: '',
+          timeLimit: '',
+          passingScoreNormal: '80',
+          passingScoreToWatch: '90',
+          questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
+        })
+        fetchQuizzes()
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du quiz:', error)
+    }
+  }
+
+  const cancelEdit = () => {
+    setShowEditForm(false)
+    setEditingQuiz(null)
+    setNewQuiz({
+      title: '',
+      description: '',
+      timeLimit: '',
+      passingScoreNormal: '80',
+      passingScoreToWatch: '90',
+      questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
+    })
   }
 
   const formatTime = (seconds: number) => {
@@ -341,7 +656,44 @@ export default function QuizManager() {
 
   // Quiz Taking Interface
   if (activeQuiz && !showResults) {
-    const currentQuestion = activeQuiz.questions[currentQuestionIndex]
+    const currentQuestion = activeQuiz.questions?.[currentQuestionIndex]
+    
+    // Safety check to ensure questions and options exist
+    if (!currentQuestion || !currentQuestion.options || !Array.isArray(currentQuestion.options)) {
+      return (
+        <>
+          {styles}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '48px',
+            ...modernDesign.glass.card
+          }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}>
+              <div style={{fontSize: '48px'}}>⚠️</div>
+              <p style={{...modernDesign.typography.body, color: '#d1d5db', textAlign: 'center'}}>
+                Erreur lors du chargement des questions du quiz.<br/>
+                Veuillez réessayer ou contacter l'administrateur.
+              </p>
+              <button
+                onClick={() => setActiveQuiz(null)}
+                className="quiz-btn-primary"
+                style={{padding: '12px 24px'}}
+              >
+                ← Retour aux quiz
+              </button>
+            </div>
+          </div>
+        </>
+      )
+    }
+    
     const progress = activeQuiz.questions?.length > 0 
       ? ((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100 
       : 0
@@ -527,20 +879,28 @@ export default function QuizManager() {
                           ? '2px solid #3b82f6' 
                           : '1px solid rgba(59, 130, 246, 0.3)',
                         background: answers[currentQuestion.id] === index.toString()
-                          ? 'rgba(59, 130, 246, 0.1)'
-                          : 'rgba(15, 23, 42, 0.8)',
+                          ? 'rgba(59, 130, 246, 0.15)'
+                          : 'rgba(15, 23, 42, 0.9)',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
                         fontSize: '16px',
-                        fontWeight: '500'
+                        fontWeight: '500',
+                        color: '#e5e7eb'
                       }}
-                      {...createHoverEffect(
-                        {},
-                        {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)'
-                        }
-                      )}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.3)';
+                        e.currentTarget.style.background = answers[currentQuestion.id] === index.toString()
+                          ? 'rgba(59, 130, 246, 0.25)'
+                          : 'rgba(30, 41, 59, 0.9)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = '';
+                        e.currentTarget.style.boxShadow = '';
+                        e.currentTarget.style.background = answers[currentQuestion.id] === index.toString()
+                          ? 'rgba(59, 130, 246, 0.15)'
+                          : 'rgba(15, 23, 42, 0.9)';
+                      }}
                     >
                       <div style={{
                         display: 'flex',
@@ -551,7 +911,9 @@ export default function QuizManager() {
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          border: '2px solid #3b82f6',
+                          border: answers[currentQuestion.id] === index.toString()
+                            ? '2px solid #ffffff'
+                            : '2px solid #3b82f6',
                           background: answers[currentQuestion.id] === index.toString()
                             ? '#3b82f6'
                             : 'transparent',
@@ -560,11 +922,18 @@ export default function QuizManager() {
                           justifyContent: 'center',
                           fontSize: '12px',
                           fontWeight: '700',
-                          color: 'white'
+                          color: answers[currentQuestion.id] === index.toString()
+                            ? '#ffffff'
+                            : '#3b82f6'
                         }}>
                           {String.fromCharCode(65 + index)}
                         </div>
-                        <span>{option}</span>
+                        <span style={{
+                          color: '#e5e7eb',
+                          lineHeight: '1.5'
+                        }}>
+                          {option}
+                        </span>
                       </div>
                     </button>
                   ))}
@@ -579,21 +948,19 @@ export default function QuizManager() {
               gap: '16px'
             }}>
               <button
-                onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
-                disabled={currentQuestionIndex === 0}
-                style={{
-                  ...modernDesign.buttons.secondary,
-                  padding: '16px 24px',
-                  opacity: currentQuestionIndex === 0 ? 0.5 : 1,
-                  cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
-                }}
-                {...(currentQuestionIndex > 0 ? createHoverEffect(
-                  {},
-                  {
-                    transform: 'translateY(-2px)',
-                    background: 'rgba(59, 130, 246, 0.2)'
+                onClick={() => {
+                  const newIndex = Math.max(0, currentQuestionIndex - 1)
+                  setCurrentQuestionIndex(newIndex)
+                  // Sauvegarder le progrès quand on change de question
+                  if (session?.user.role === 'CANDIDAT') {
+                    setTimeout(() => saveQuizProgress(), 200)
                   }
-                ) : {})}
+                }}
+                disabled={currentQuestionIndex === 0}
+                className={`quiz-btn-secondary ${currentQuestionIndex === 0 ? 'quiz-btn-disabled' : ''}`}
+                style={{
+                  padding: '16px 24px'
+                }}
               >
                 ← Précédent
               </button>
@@ -601,36 +968,27 @@ export default function QuizManager() {
               {currentQuestionIndex === activeQuiz.questions.length - 1 ? (
                 <button
                   onClick={handleSubmitQuiz}
+                  className="quiz-btn-success"
                   style={{
-                    ...modernDesign.buttons.primary,
-                    padding: '16px 32px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+                    padding: '16px 32px'
                   }}
-                  {...createHoverEffect(
-                    {},
-                    {
-                      transform: 'translateY(-2px) scale(1.02)',
-                      boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
-                    }
-                  )}
                 >
                   🎯 Terminer le quiz
                 </button>
               ) : (
                 <button
-                  onClick={() => setCurrentQuestionIndex(Math.min(activeQuiz.questions.length - 1, currentQuestionIndex + 1))}
+                  onClick={() => {
+                    const newIndex = Math.min(activeQuiz.questions.length - 1, currentQuestionIndex + 1)
+                    setCurrentQuestionIndex(newIndex)
+                    // Sauvegarder le progrès quand on change de question
+                    if (session?.user.role === 'CANDIDAT') {
+                      setTimeout(() => saveQuizProgress(), 200)
+                    }
+                  }}
+                  className="quiz-btn-primary"
                   style={{
-                    ...modernDesign.buttons.primary,
                     padding: '16px 24px'
                   }}
-                  {...createHoverEffect(
-                    {},
-                    {
-                      transform: 'translateY(-2px) scale(1.02)',
-                      boxShadow: '0 8px 25px rgba(59, 130, 246, 0.4)'
-                    }
-                  )}
                 >
                   Suivant →
                 </button>
@@ -738,7 +1096,7 @@ export default function QuizManager() {
                   fontSize: '16px',
                   color: '#d1d5db'
                 }}>
-                  Score requis: {activeQuiz?.passingScore}%
+                  Score requis: {activeQuiz?.passingScoreNormal}% (normal) / {activeQuiz?.passingScoreToWatch}% (à surveiller)
                 </div>
               </div>
 
@@ -817,18 +1175,11 @@ export default function QuizManager() {
                   setShowResults(false)
                   setResults(null)
                 }}
+                className="quiz-btn-primary"
                 style={{
-                  ...modernDesign.buttons.primary,
                   padding: '16px 32px',
                   fontSize: '16px'
                 }}
-                {...createHoverEffect(
-                  {},
-                  {
-                    transform: 'translateY(-2px) scale(1.05)',
-                    boxShadow: '0 12px 30px rgba(59, 130, 246, 0.4)'
-                  }
-                )}
               >
                 ← Retour aux quiz
               </button>
@@ -890,23 +1241,14 @@ export default function QuizManager() {
           {isAdmin && (
             <button
               onClick={() => setShowCreateForm(true)}
+              className="quiz-btn-primary"
               style={{
-                ...modernDesign.buttons.primary,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 fontSize: '16px',
-                padding: '16px 24px',
-                position: 'relative',
-                overflow: 'hidden'
+                padding: '16px 24px'
               }}
-              {...createHoverEffect(
-                {},
-                {
-                  transform: 'translateY(-2px) scale(1.05)',
-                  boxShadow: '0 12px 30px rgba(59, 130, 246, 0.4)'
-                }
-              )}
             >
               <span style={{fontSize: '20px'}}>➕</span>
               <span>Nouveau Quiz</span>
@@ -969,10 +1311,7 @@ export default function QuizManager() {
                     type="text"
                     value={newQuiz.title}
                     onChange={(e) => setNewQuiz({...newQuiz, title: e.target.value})}
-                    style={{
-                      ...modernDesign.inputs.modern,
-                      width: '100%'
-                    }}
+                    className="quiz-form-input"
                     placeholder="Ex: Quiz de culture générale"
                   />
                 </div>
@@ -1007,18 +1346,43 @@ export default function QuizManager() {
                     fontSize: '14px',
                     fontWeight: '600'
                   }}>
-                    Score de réussite (%)
+                    Score candidats normaux (%)
                   </label>
                   <input
                     type="number"
-                    value={newQuiz.passingScore}
-                    onChange={(e) => setNewQuiz({...newQuiz, passingScore: e.target.value})}
+                    value={newQuiz.passingScoreNormal}
+                    onChange={(e) => setNewQuiz({...newQuiz, passingScoreNormal: e.target.value})}
                     min="0"
                     max="100"
                     style={{
                       ...modernDesign.inputs.modern,
                       width: '100%'
                     }}
+                    placeholder="80"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#d1d5db',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    Score candidats à surveiller (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={newQuiz.passingScoreToWatch}
+                    onChange={(e) => setNewQuiz({...newQuiz, passingScoreToWatch: e.target.value})}
+                    min="0"
+                    max="100"
+                    style={{
+                      ...modernDesign.inputs.modern,
+                      width: '100%'
+                    }}
+                    placeholder="90"
                   />
                 </div>
               </div>
@@ -1067,18 +1431,11 @@ export default function QuizManager() {
                   </h4>
                   <button
                     onClick={addQuestion}
+                    className="quiz-btn-secondary"
                     style={{
-                      ...modernDesign.buttons.secondary,
                       fontSize: '14px',
                       padding: '12px 20px'
                     }}
-                    {...createHoverEffect(
-                      {},
-                      {
-                        background: 'rgba(59, 130, 246, 0.2)',
-                        transform: 'scale(1.05)'
-                      }
-                    )}
                   >
                     ➕ Ajouter une question
                   </button>
@@ -1114,22 +1471,11 @@ export default function QuizManager() {
                         {newQuiz.questions.length > 1 && (
                           <button
                             onClick={() => removeQuestion(questionIndex)}
+                            className="quiz-btn-danger"
                             style={{
-                              background: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#fca5a5',
-                              borderRadius: '6px',
                               padding: '6px 12px',
-                              fontSize: '12px',
-                              cursor: 'pointer'
+                              fontSize: '12px'
                             }}
-                            {...createHoverEffect(
-                              {},
-                              {
-                                background: 'rgba(239, 68, 68, 0.2)',
-                                transform: 'scale(1.05)'
-                              }
-                            )}
                           >
                             🗑️ Supprimer
                           </button>
@@ -1243,37 +1589,375 @@ export default function QuizManager() {
               }}>
                 <button
                   onClick={() => setShowCreateForm(false)}
+                  className="quiz-btn-secondary"
                   style={{
-                    ...modernDesign.buttons.secondary,
                     padding: '14px 28px'
                   }}
-                  {...createHoverEffect(
-                    {},
-                    {
-                      background: 'rgba(59, 130, 246, 0.1)',
-                      transform: 'translateY(-1px)'
-                    }
-                  )}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={createQuiz}
+                  className="quiz-btn-success"
                   style={{
-                    ...modernDesign.buttons.primary,
-                    padding: '14px 28px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+                    padding: '14px 28px'
                   }}
-                  {...createHoverEffect(
-                    {},
-                    {
-                      transform: 'translateY(-2px) scale(1.02)',
-                      boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
-                    }
-                  )}
                 >
                   ✨ Créer le quiz
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quiz Edit Form */}
+        {showEditForm && editingQuiz && isAdmin && (
+          <div style={{
+            ...modernDesign.glass.card,
+            padding: '32px',
+            marginBottom: '32px',
+            position: 'relative',
+            overflow: 'hidden',
+            animation: 'modernScale 0.4s ease-out'
+          }}>
+            {/* Form background gradient */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
+              opacity: 0.5
+            }} />
+            
+            <div style={{position: 'relative', zIndex: 1}}>
+              <h3 style={{
+                ...modernDesign.typography.subtitle,
+                fontSize: '24px',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <span style={{fontSize: '28px'}}>✏️</span>
+                Modifier le quiz: {editingQuiz.title}
+              </h3>
+              
+              {/* Quiz Info Form */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: '24px',
+                marginBottom: '32px'
+              }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#d1d5db',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    Titre du quiz
+                  </label>
+                  <input
+                    type="text"
+                    value={newQuiz.title}
+                    onChange={(e) => setNewQuiz({...newQuiz, title: e.target.value})}
+                    className="quiz-form-input"
+                    placeholder="Ex: Quiz de culture générale"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#d1d5db',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    Limite de temps (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={newQuiz.timeLimit}
+                    onChange={(e) => setNewQuiz({...newQuiz, timeLimit: e.target.value})}
+                    style={{
+                      ...modernDesign.inputs.modern,
+                      width: '100%'
+                    }}
+                    placeholder="Ex: 30"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#d1d5db',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    Score candidats normaux (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={newQuiz.passingScoreNormal}
+                    onChange={(e) => setNewQuiz({...newQuiz, passingScoreNormal: e.target.value})}
+                    min="0"
+                    max="100"
+                    style={{
+                      ...modernDesign.inputs.modern,
+                      width: '100%'
+                    }}
+                    placeholder="80"
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#d1d5db',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    Score candidats à surveiller (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={newQuiz.passingScoreToWatch}
+                    onChange={(e) => setNewQuiz({...newQuiz, passingScoreToWatch: e.target.value})}
+                    min="0"
+                    max="100"
+                    style={{
+                      ...modernDesign.inputs.modern,
+                      width: '100%'
+                    }}
+                    placeholder="90"
+                  />
+                </div>
+              </div>
+
+              <div style={{marginBottom: '32px'}}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#d1d5db',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Description
+                </label>
+                <textarea
+                  value={newQuiz.description}
+                  onChange={(e) => setNewQuiz({...newQuiz, description: e.target.value})}
+                  style={{
+                    ...modernDesign.inputs.modern,
+                    width: '100%',
+                    minHeight: '100px',
+                    resize: 'vertical'
+                  }}
+                  placeholder="Description du quiz..."
+                />
+              </div>
+
+              {/* Questions Section */}
+              <div style={{marginBottom: '32px'}}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '24px'
+                }}>
+                  <h4 style={{
+                    ...modernDesign.typography.subtitle,
+                    fontSize: '20px',
+                    margin: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{fontSize: '24px'}}>❓</span>
+                    Questions ({newQuiz.questions.length})
+                  </h4>
+                  <button
+                    onClick={addQuestion}
+                    className="quiz-btn-secondary"
+                    style={{
+                      fontSize: '14px',
+                      padding: '12px 20px'
+                    }}
+                  >
+                    ➕ Ajouter une question
+                  </button>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gap: '24px'
+                }}>
+                  {newQuiz.questions.map((question, questionIndex) => (
+                    <div
+                      key={questionIndex}
+                      style={{
+                        ...modernDesign.glass.card,
+                        padding: '24px',
+                        border: '1px solid rgba(139, 92, 246, 0.3)'
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '16px'
+                      }}>
+                        <h5 style={{
+                          margin: '0',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          color: '#e5e7eb'
+                        }}>
+                          Question {questionIndex + 1}
+                        </h5>
+                        {newQuiz.questions.length > 1 && (
+                          <button
+                            onClick={() => removeQuestion(questionIndex)}
+                            className="quiz-btn-danger"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px'
+                            }}
+                          >
+                            🗑️ Supprimer
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{marginBottom: '16px'}}>
+                        <label style={{
+                          display: 'block',
+                          marginBottom: '8px',
+                          color: '#d1d5db',
+                          fontSize: '14px',
+                          fontWeight: '600'
+                        }}>
+                          Énoncé de la question
+                        </label>
+                        <textarea
+                          value={question.question}
+                          onChange={(e) => updateQuestion(questionIndex, 'question', e.target.value)}
+                          style={{
+                            ...modernDesign.inputs.modern,
+                            width: '100%',
+                            minHeight: '80px',
+                            resize: 'vertical'
+                          }}
+                          placeholder="Saisissez votre question..."
+                        />
+                      </div>
+
+                      <div style={{
+                        display: 'grid',
+                        gap: '12px',
+                        marginBottom: '16px'
+                      }}>
+                        <label style={{
+                          color: '#d1d5db',
+                          fontSize: '14px',
+                          fontWeight: '600'
+                        }}>
+                          Options de réponse
+                        </label>
+                        {question.options.map((option, optionIndex) => (
+                          <div
+                            key={optionIndex}
+                            style={{
+                              display: 'flex',
+                              gap: '12px',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`correct-edit-${questionIndex}`}
+                              checked={question.correctAnswer === optionIndex.toString()}
+                              onChange={() => updateQuestion(questionIndex, 'correctAnswer', optionIndex.toString())}
+                              style={{
+                                width: '20px',
+                                height: '20px',
+                                accentColor: '#3b82f6'
+                              }}
+                            />
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(e) => {
+                                const newOptions = [...question.options]
+                                newOptions[optionIndex] = e.target.value
+                                updateQuestion(questionIndex, 'options', newOptions)
+                              }}
+                              style={{
+                                ...modernDesign.inputs.modern,
+                                flex: 1
+                              }}
+                              placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          marginBottom: '8px',
+                          color: '#d1d5db',
+                          fontSize: '14px',
+                          fontWeight: '600'
+                        }}>
+                          Points
+                        </label>
+                        <input
+                          type="number"
+                          value={question.points}
+                          onChange={(e) => updateQuestion(questionIndex, 'points', e.target.value)}
+                          min="1"
+                          style={{
+                            ...modernDesign.inputs.modern,
+                            width: '100px'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Form Actions */}
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={cancelEdit}
+                  className="quiz-btn-secondary"
+                  style={{
+                    padding: '14px 28px'
+                  }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={updateQuiz}
+                  className="quiz-btn-success"
+                  style={{
+                    padding: '14px 28px'
+                  }}
+                >
+                  💾 Mettre à jour le quiz
                 </button>
               </div>
             </div>
@@ -1296,15 +1980,17 @@ export default function QuizManager() {
                 overflow: 'hidden',
                 padding: '24px',
                 animation: `modernSlideIn 0.5s ease-out ${index * 0.1}s both`,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer'
               }}
-              {...createHoverEffect(
-                {},
-                {
-                  transform: 'translateY(-8px) scale(1.02)',
-                  boxShadow: '0 20px 40px rgba(59, 130, 246, 0.2)'
-                }
-              )}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = '';
+                e.currentTarget.style.boxShadow = '';
+              }}
             >
               {/* Quiz Status Badge */}
               <div style={{
@@ -1316,12 +2002,10 @@ export default function QuizManager() {
                 fontWeight: '600',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                background: quiz.isActive 
-                  ? 'rgba(16, 185, 129, 0.2)' 
-                  : 'rgba(156, 163, 175, 0.2)',
-                color: quiz.isActive ? '#10b981' : '#9ca3af'
+                background: 'rgba(16, 185, 129, 0.2)',
+                color: '#10b981'
               }}>
-                {quiz.isActive ? 'Actif' : 'Inactif'}
+                Actif
               </div>
 
               {/* Quiz Header */}
@@ -1419,7 +2103,7 @@ export default function QuizManager() {
                     color: '#10b981',
                     marginBottom: '4px'
                   }}>
-                    {quiz.passingScore}%
+                    {quiz.passingScoreNormal}% / {quiz.passingScoreToWatch}%
                   </div>
                   <div style={{
                     fontSize: '12px',
@@ -1471,80 +2155,14 @@ export default function QuizManager() {
               )}
 
               {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                flexWrap: 'wrap'
-              }}>
-                {session?.user.role === 'CANDIDAT' ? (
-                  <button
-                    onClick={() => startQuiz(quiz)}
-                    disabled={!quiz.isActive}
-                    style={{
-                      ...modernDesign.buttons.primary,
-                      flex: '1',
-                      minWidth: '120px',
-                      fontSize: '14px',
-                      padding: '12px 16px',
-                      opacity: quiz.isActive ? 1 : 0.5,
-                      cursor: quiz.isActive ? 'pointer' : 'not-allowed'
-                    }}
-                    {...(quiz.isActive ? createHoverEffect(
-                      {},
-                      {
-                        transform: 'scale(1.05)',
-                        boxShadow: '0 8px 25px rgba(59, 130, 246, 0.4)'
-                      }
-                    ) : {})}
-                  >
-                    🎯 {quiz.hasAttempt ? 'Reprendre' : 'Commencer'}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => startQuiz(quiz)}
-                      style={{
-                        ...modernDesign.buttons.secondary,
-                        flex: '1',
-                        minWidth: '100px',
-                        fontSize: '14px',
-                        padding: '12px 16px'
-                      }}
-                      {...createHoverEffect(
-                        {},
-                        {
-                          background: 'rgba(59, 130, 246, 0.2)',
-                          transform: 'scale(1.05)'
-                        }
-                      )}
-                    >
-                      👁️ Prévisualiser
-                    </button>
-                    <button
-                      onClick={() => deleteQuiz(quiz.id)}
-                      style={{
-                        ...modernDesign.buttons.secondary,
-                        flex: '1',
-                        minWidth: '100px',
-                        fontSize: '14px',
-                        padding: '12px 16px',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#fca5a5'
-                      }}
-                      {...createHoverEffect(
-                        {},
-                        {
-                          background: 'rgba(239, 68, 68, 0.2)',
-                          transform: 'scale(1.05)'
-                        }
-                      )}
-                    >
-                      🗑️ Supprimer
-                    </button>
-                  </>
-                )}
-              </div>
+              <QuizActionButtons 
+                quiz={quiz} 
+                session={session} 
+                onStartQuiz={startQuiz}
+                onEditQuiz={startEditQuiz}
+                onDeleteQuiz={deleteQuiz}
+                checkProgress={checkQuizProgress}
+              />
             </div>
           ))}
         </div>
@@ -1586,18 +2204,11 @@ export default function QuizManager() {
             {isAdmin && (
               <button
                 onClick={() => setShowCreateForm(true)}
+                className="quiz-btn-primary"
                 style={{
-                  ...modernDesign.buttons.primary,
                   padding: '16px 32px',
                   fontSize: '16px'
                 }}
-                {...createHoverEffect(
-                  {},
-                  {
-                    transform: 'translateY(-2px) scale(1.05)',
-                    boxShadow: '0 12px 30px rgba(59, 130, 246, 0.4)'
-                  }
-                )}
               >
                 ✨ Créer mon premier quiz
               </button>
@@ -1690,5 +2301,196 @@ export default function QuizManager() {
         )}
       </div>
     </>
+  )
+}
+
+// Composant pour gérer les boutons d'action avec la logique anti-triche
+function QuizActionButtons({ 
+  quiz, 
+  session, 
+  onStartQuiz, 
+  onEditQuiz, 
+  onDeleteQuiz, 
+  checkProgress 
+}: {
+  quiz: Quiz
+  session: any
+  onStartQuiz: (quiz: Quiz, forceRestart?: boolean) => void
+  onEditQuiz: (quiz: Quiz) => void
+  onDeleteQuiz: (quizId: string) => void
+  checkProgress: (quizId: string) => Promise<any>
+}) {
+  const [hasProgress, setHasProgress] = useState(false)
+  const [progressInfo, setProgressInfo] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (session?.user.role === 'CANDIDAT') {
+      checkForProgress()
+    }
+  }, [quiz.id, session])
+
+  const checkForProgress = async () => {
+    setLoading(true)
+    try {
+      const progress = await checkProgress(quiz.id)
+      setHasProgress(!!progress)
+      setProgressInfo(progress)
+    } catch (error) {
+      console.error('Erreur lors de la vérification du progrès:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStartQuiz = () => {
+    onStartQuiz(quiz, false)
+  }
+
+  const handleRestartQuiz = () => {
+    if (confirm('Êtes-vous sûr de vouloir recommencer ce quiz ? Votre progrès actuel sera perdu.')) {
+      onStartQuiz(quiz, true)
+    }
+  }
+
+  if (session?.user.role === 'CANDIDAT') {
+    // Si le quiz a déjà été passé, afficher seulement le statut
+    if (quiz.hasAttempt) {
+      return (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            flex: '1',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            background: quiz.attemptPassed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+            border: quiz.attemptPassed ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              color: quiz.attemptPassed ? '#10b981' : '#ef4444',
+              marginBottom: '4px'
+            }}>
+              {quiz.attemptPassed ? '✅ Quiz réussi' : '❌ Quiz échoué'}
+            </div>
+            <div style={{
+              fontSize: '12px',
+              color: '#9ca3af'
+            }}>
+              Score: {quiz.attemptScore}%
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        flexWrap: 'wrap'
+      }}>
+        {hasProgress ? (
+          <>
+            <button
+              onClick={handleStartQuiz}
+              className="quiz-btn-success"
+              style={{
+                flex: '1',
+                minWidth: '100px',
+                fontSize: '14px',
+                padding: '12px 16px'
+              }}
+              disabled={loading}
+            >
+              ▶️ Continuer
+              {progressInfo && (
+                <div style={{fontSize: '11px', opacity: 0.8, marginTop: '2px'}}>
+                  Question {progressInfo.currentQuestionIndex + 1} - {Math.floor(progressInfo.timeLeft / 60)}:{(progressInfo.timeLeft % 60).toString().padStart(2, '0')}
+                </div>
+              )}
+            </button>
+            <button
+              onClick={handleRestartQuiz}
+              className="quiz-btn-secondary"
+              style={{
+                minWidth: '80px',
+                fontSize: '13px',
+                padding: '8px 12px'
+              }}
+              disabled={loading}
+            >
+              🔄 Recommencer
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={handleStartQuiz}
+            className="quiz-btn-primary"
+            style={{
+              flex: '1',
+              minWidth: '120px',
+              fontSize: '14px',
+              padding: '12px 16px'
+            }}
+            disabled={loading}
+          >
+            🎯 Commencer
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // Boutons pour les admins
+  return (
+    <div style={{
+      display: 'flex',
+      gap: '12px',
+      flexWrap: 'wrap'
+    }}>
+      <button
+        onClick={handleStartQuiz}
+        className="quiz-btn-secondary"
+        style={{
+          flex: '1',
+          minWidth: '90px',
+          fontSize: '14px',
+          padding: '12px 16px'
+        }}
+      >
+        👁️ Prévisualiser
+      </button>
+      <button
+        onClick={() => onEditQuiz(quiz)}
+        className="quiz-btn-primary"
+        style={{
+          flex: '1',
+          minWidth: '90px',
+          fontSize: '14px',
+          padding: '12px 16px'
+        }}
+      >
+        ✏️ Modifier
+      </button>
+      <button
+        onClick={() => onDeleteQuiz(quiz.id)}
+        className="quiz-btn-danger"
+        style={{
+          flex: '1',
+          minWidth: '90px',
+          fontSize: '14px',
+          padding: '12px 16px'
+        }}
+      >
+        🗑️ Supprimer
+      </button>
+    </div>
   )
 }

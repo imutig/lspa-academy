@@ -37,6 +37,15 @@ export default function CandidateDashboard() {
 
   useEffect(() => {
     setIsLoaded(true)
+    
+    // Vérifier les paramètres URL pour l'ouverture directe d'un quiz
+    const urlParams = new URLSearchParams(window.location.search)
+    const activeTabParam = urlParams.get('activeTab')
+    const quizId = urlParams.get('quizId')
+    
+    if (activeTabParam === 'quiz' && quizId) {
+      setActiveTab('quiz')
+    }
   }, [])
 
   useEffect(() => {

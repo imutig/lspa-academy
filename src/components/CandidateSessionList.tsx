@@ -35,7 +35,10 @@ export default function CandidateSessionList() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+    // Mise à jour automatique toutes les 8 secondes pour détecter rapidement les changements
+    const interval = setInterval(fetchData, 8000)
+    return () => clearInterval(interval)
+  }, [session?.user.id])
 
   const fetchData = async () => {
     try {
@@ -66,6 +69,8 @@ export default function CandidateSessionList() {
 
   const registerForSession = async (sessionId: string) => {
     try {
+      setError('') // Effacer les erreurs précédentes
+      
       const response = await fetch('/api/sessions/register', {
         method: 'POST',
         headers: {
@@ -75,11 +80,62 @@ export default function CandidateSessionList() {
       })
 
       if (response.ok) {
-        fetchData() // Rechargement des données
+        const data = await response.json()
+        
+        // Mise à jour immédiate de l'état local
+        const newRegistration: Registration = {
+          id: data.registration.id,
+          sessionId: sessionId,
+          status: 'REGISTERED',
+          createdAt: new Date().toISOString(),
+          session: {
+            id: sessionId,
+            name: sessions.find(s => s.id === sessionId)?.name || '',
+            status: 'PLANNED'
+          }
+        }
+        setRegistrations(prev => [...prev, newRegistration])
+        
+        // Rechargement complet des données pour s'assurer de la cohérence
+        await fetchData()
+        
         setError('')
       } else {
         const errorData = await response.json()
         setError(errorData.error || 'Erreur lors de l\'inscription')
+      }
+    } catch (error) {
+      setError('Erreur de connexion')
+    }
+  }
+
+  const unregisterFromSession = async (sessionId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir vous désinscrire de cette session ?')) {
+      return
+    }
+
+    try {
+      setError('')
+      
+      const response = await fetch('/api/candidate/unregister', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ sessionId })
+      })
+
+      if (response.ok) {
+        // Mise à jour immédiate de l'état local
+        setRegistrations(prev => prev.filter(reg => reg.sessionId !== sessionId))
+        
+        // Rechargement complet des données pour s'assurer de la cohérence
+        await fetchData()
+        
+        setError('')
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || 'Erreur lors de la désinscription')
       }
     } catch (error) {
       setError('Erreur de connexion')
@@ -285,17 +341,45 @@ export default function CandidateSessionList() {
                     gap: '12px'
                   }}>
                     {registered ? (
-                      <span style={{
-                        background: 'rgba(34, 197, 94, 0.2)',
-                        color: '#22c55e',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        border: '1px solid rgba(34, 197, 94, 0.3)'
-                      }}>
-                        ✅ Inscrit
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          background: 'rgba(34, 197, 94, 0.2)',
+                          color: '#22c55e',
+                          padding: '8px 16px',
+                          borderRadius: '20px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          border: '1px solid rgba(34, 197, 94, 0.3)'
+                        }}>
+                          ✅ Inscrit
+                        </span>
+                        {sess.status === 'PLANNED' && (
+                          <button
+                            onClick={() => unregisterFromSession(sess.id)}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#dc2626',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              borderRadius: '20px',
+                              padding: '8px 16px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)'
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)'
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
+                            }}
+                          >
+                            Se désinscrire
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <button
                         onClick={() => registerForSession(sess.id)}

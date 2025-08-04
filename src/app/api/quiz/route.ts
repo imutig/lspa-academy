@@ -17,6 +17,48 @@ export async function GET(request: NextRequest) {
     const includeQuestions = searchParams.get('includeQuestions') === 'true'
 
     if (quizId) {
+      // Pour les candidats, vérifier l'accès au quiz basé sur l'entretien
+      if (session.user.role === 'CANDIDAT' && sessionId) {
+        const sessionCandidate = await prisma.sessionCandidate.findUnique({
+          where: {
+            sessionId_userId: {
+              sessionId,
+              userId: session.user.id
+            }
+          },
+          include: {
+            session: {
+              include: {
+                interviews: {
+                  where: { candidateId: session.user.id }
+                }
+              }
+            }
+          }
+        })
+
+        if (!sessionCandidate) {
+          return NextResponse.json({ error: 'Vous n\'êtes pas inscrit à cette session' }, { status: 403 })
+        }
+
+        // Vérifier que l'entretien est terminé
+        const interview = sessionCandidate.session.interviews[0]
+        if (!interview || interview.status !== 'COMPLETED') {
+          return NextResponse.json({ 
+            error: 'Vous devez terminer votre entretien avant d\'accéder au quiz',
+            code: 'INTERVIEW_NOT_COMPLETED'
+          }, { status: 403 })
+        }
+
+        // Vérifier que la décision d'entretien n'est pas défavorable
+        if (interview.decision === 'DEFAVORABLE') {
+          return NextResponse.json({ 
+            error: 'Accès au quiz refusé suite à la décision d\'entretien',
+            code: 'INTERVIEW_UNFAVORABLE'
+          }, { status: 403 })
+        }
+      }
+
       // Récupérer un quiz spécifique
       const quiz = await prisma.quiz.findUnique({
         where: { id: quizId },
@@ -39,6 +81,39 @@ export async function GET(request: NextRequest) {
 
       if (!quiz) {
         return NextResponse.json({ error: 'Quiz non trouvé' }, { status: 404 })
+      }
+
+      // Parse options JSON strings back to arrays for questions
+      if (includeQuestions && quiz.questions) {
+        (quiz as any).questions = quiz.questions.map(question => {
+          let parsedOptions = []
+          
+          if (question.options) {
+            try {
+              const optionsData = JSON.parse(question.options)
+              
+              // Handle both old format (objects with text/isCorrect) and new format (simple strings)
+              if (Array.isArray(optionsData)) {
+                parsedOptions = optionsData.map(option => {
+                  if (typeof option === 'string') {
+                    return option
+                  } else if (option && typeof option === 'object' && option.text) {
+                    return option.text
+                  }
+                  return String(option)
+                })
+              }
+            } catch (error) {
+              console.error('Error parsing options for question:', question.id, error)
+              parsedOptions = []
+            }
+          }
+          
+          return {
+            ...question,
+            options: parsedOptions
+          }
+        })
       }
 
       return NextResponse.json(quiz)
@@ -103,8 +178,8 @@ export async function POST(request: NextRequest) {
         questions: questions ? {
           create: questions.map((q: any, index: number) => ({
             question: q.question,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
+            options: JSON.stringify(q.options), // Convert array to JSON string
+            correctAnswer: q.correctAnswer.toString(), // Ensure it's a string
             points: q.points || 1,
             order: index + 1
           }))
@@ -132,17 +207,39 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { id, title, description, timeLimit, passingScore, isActive } = body
+    const { searchParams } = new URL(request.url)
+    const quizId = searchParams.get('id')
+    
+    if (!quizId) {
+      return NextResponse.json({ error: 'ID du quiz requis' }, { status: 400 })
+    }
 
+    const body = await request.json()
+    const { title, description, timeLimit, passingScoreNormal, passingScoreToWatch, questions } = body
+
+    // Supprimer toutes les questions existantes du quiz
+    await prisma.question.deleteMany({
+      where: { quizId }
+    })
+
+    // Mettre à jour le quiz avec les nouvelles données
     const quiz = await prisma.quiz.update({
-      where: { id },
+      where: { id: quizId },
       data: {
         title,
         description,
-        timeLimit: timeLimit ? parseInt(timeLimit) : null,
-        passingScore: passingScore ? parseInt(passingScore) : undefined,
-        isActive
+        timeLimit: timeLimit ? parseInt(timeLimit) : undefined,
+        passingScoreNormal: passingScoreNormal ? parseInt(passingScoreNormal) : undefined,
+        passingScoreToWatch: passingScoreToWatch ? parseInt(passingScoreToWatch) : undefined,
+        questions: questions ? {
+          create: questions.map((q: any, index: number) => ({
+            question: q.question,
+            options: JSON.stringify(q.options), // Convert array to JSON string
+            correctAnswer: q.correctAnswer.toString(), // Ensure it's a string
+            points: q.points || 1,
+            order: index + 1
+          }))
+        } : undefined
       },
       include: {
         questions: true,

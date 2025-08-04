@@ -262,13 +262,13 @@ export const modernDesign = {
 
 // Helper functions for hover effects
 export const createHoverEffect = (baseStyle: React.CSSProperties, hoverStyle: React.CSSProperties) => {
-  // Performance optimized version - use CSS classes instead of inline event handlers
+  // Simple version that returns only compatible CSS properties
   return {
-    ...baseStyle,
-    className: 'hover-optimized',
-    // Fallback for critical effects only
-    onMouseEnter: undefined,
-    onMouseLeave: undefined
+    style: {
+      ...baseStyle,
+      transition: 'all 0.3s ease',
+      cursor: 'pointer'
+    }
   }
 }
 

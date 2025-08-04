@@ -102,7 +102,7 @@ export default function NotificationBanner() {
             {notification.type === 'quiz' && notification.quizId && (
               <button
                 onClick={() => {
-                  window.location.href = `/candidate/quiz/${notification.quizId}?sessionId=${notification.sessionId}`
+                  window.location.href = `/candidate/dashboard?activeTab=quiz&quizId=${notification.quizId}`
                 }}
                 style={{
                   padding: '8px 16px',

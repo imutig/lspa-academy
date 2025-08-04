@@ -9,7 +9,6 @@ import SessionManager from "@/components/SessionManager"
 import SessionListView from "@/components/SessionListView"
 import QuizManager from "@/components/QuizManager"
 import { modernDesign, getAnimationDelay } from "@/utils/modernDesign"
-import AdminQuizManager from "@/components/AdminQuizManager"
 import InterviewQuestionManager from "@/components/InterviewQuestionManager"
 import RegistrationCodesManager from "@/components/RegistrationCodesManager"
 import SituationManager from "@/components/SituationManager"
@@ -293,7 +292,6 @@ export default function AdminDashboard() {
               { key: 'roles', label: 'Rôles', icon: '👔' },
               { key: 'sessions', label: 'Sessions', icon: '📚' },
               { key: 'quizzes', label: 'Quiz', icon: '📝' },
-              { key: 'admin-quizzes', label: 'Gestion Quiz', icon: '⚙️' },
               { key: 'questions', label: 'Questions', icon: '❓' },
               { key: 'situations', label: 'Situations', icon: '🎯' },
               { key: 'codes', label: 'Codes', icon: '🔑' }
@@ -396,12 +394,6 @@ export default function AdminDashboard() {
             {activeTab === 'quizzes' && (
               <div style={{ animation: 'modernFadeIn 0.5s ease-out' }}>
                 <QuizManager />
-              </div>
-            )}
-
-            {activeTab === 'admin-quizzes' && (
-              <div style={{ animation: 'modernFadeIn 0.5s ease-out' }}>
-                <AdminQuizManager userRole={session?.user.role || ''} />
               </div>
             )}
 
