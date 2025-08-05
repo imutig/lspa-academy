@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Optimisations pour Vercel - changement temporaire pour le build
-  // output: 'standalone',
+  output: 'standalone',
   
   // Désactiver ESLint lors du build pour le déploiement
   eslint: {
@@ -19,7 +19,7 @@ const nextConfig = {
   // Gestion des images
   images: {
     domains: ['localhost'],
-    unoptimized: true, // Nécessaire pour output: export
+    unoptimized: false, // Remettre à false pour Vercel
   },
   
   // Variables d'environnement exposées

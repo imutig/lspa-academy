@@ -44,7 +44,7 @@ export async function GET(
 // POST - Créer une nouvelle question
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ quizId: string }> }
+  { params }: RouteParams
 ) {
   const { quizId } = await params;
   try {
