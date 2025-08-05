@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw, Users, Clock, CheckCircle2, AlertTriangle, X, RotateCcw, Play, UserX } from 'lucide-react'
 import InterviewModal from './InterviewModal'
+import InterviewReportModal from './InterviewReportModal'
 
 type CandidateStatus = 'REGISTERED' | 'EN_ATTENTE' | 'FAVORABLE' | 'A_SURVEILLER' | 'DEFAVORABLE'
 type InterviewDecision = 'FAVORABLE' | 'DEFAVORABLE' | 'A_SURVEILLER'
@@ -61,6 +62,10 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
   // États pour le modal d'entretien
   const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateMonitoring | null>(null)
+  
+  // États pour le modal de rapport d'entretien
+  const [showInterviewReportModal, setShowInterviewReportModal] = useState(false)
+  const [selectedCandidateForReport, setSelectedCandidateForReport] = useState('')
 
   // Rafraîchissement automatique plus fréquent pour une meilleure réactivité
   useEffect(() => {
@@ -202,8 +207,8 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
   }
 
   const viewInterviewReport = (candidateId: string) => {
-    // Ouvrir le rapport d'entretien dans une nouvelle fenêtre ou modal
-    window.open(`/admin/interview-report/${candidateId}?sessionId=${sessionId}`, '_blank')
+    setSelectedCandidateForReport(candidateId)
+    setShowInterviewReportModal(true)
   }
 
   const viewQuizAnswers = (candidateId: string) => {
@@ -1282,6 +1287,14 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
           }
         `}
       </style>
+
+      {/* Modal de rapport d'entretien */}
+      <InterviewReportModal
+        isOpen={showInterviewReportModal}
+        onClose={() => setShowInterviewReportModal(false)}
+        candidateId={selectedCandidateForReport}
+        sessionId={sessionId}
+      />
     </div>
   )
 }

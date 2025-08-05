@@ -1,0 +1,331 @@
+{
+  "users": [
+    {
+      "id": "cmdwi0a4m0000u9lcb48mx0pl",
+      "email": "admin@lspa.com",
+      "username": "administrateur.lspa",
+      "firstName": "Administrateur",
+      "lastName": "LSPA",
+      "password": "$2b$10$VdzNWeMI.vbrrmJEateB4ekoooqQgISASq4iku1UGALkgiV9Wf5v.",
+      "role": "DIRECTEUR",
+      "matricule": "ADM001",
+      "registrationCodeId": null,
+      "createdAt": "2025-08-04T02:35:44.326Z",
+      "updatedAt": "2025-08-04T02:35:44.326Z"
+    },
+    {
+      "id": "cmdx2pp860000u9d870v91a0h",
+      "email": "marie.martin@test.com",
+      "username": "marie.martin",
+      "firstName": "Marie",
+      "lastName": "Martin",
+      "password": "$2b$12$QHhda02EcR1pN4X2mPcb/.pudFGBbAcY0q9U12fv7MrRQKASErXJm",
+      "role": "CANDIDAT",
+      "matricule": null,
+      "registrationCodeId": null,
+      "createdAt": "2025-08-04T12:15:22.614Z",
+      "updatedAt": "2025-08-04T12:15:22.614Z"
+    },
+    {
+      "id": "cmdx2ppe20005u9d88jznvf47",
+      "email": "jean.dupont@test.com",
+      "username": "jean.dupont",
+      "firstName": "Jean",
+      "lastName": "Dupont",
+      "password": "$2b$12$jzyVAxl9x./5KCMm6/ayjusu9kwecDqrX2cPIfLf4vrXk3j1qWSDS",
+      "role": "CANDIDAT",
+      "matricule": null,
+      "registrationCodeId": null,
+      "createdAt": "2025-08-04T12:15:22.827Z",
+      "updatedAt": "2025-08-04T12:15:22.827Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "cmdyjjefr0009u94wgmkv6cyk",
+      "name": "Test",
+      "description": "",
+      "date": "2025-08-05T12:54:00.000Z",
+      "location": "test",
+      "maxCandidates": 20,
+      "status": "PLANNED",
+      "createdAt": "2025-08-05T12:54:08.343Z",
+      "updatedAt": "2025-08-05T12:54:08.343Z",
+      "createdBy": "admin"
+    }
+  ],
+  "quizzes": [
+    {
+      "id": "cmdx30uad0000u9igxdn1qaj4",
+      "title": "Quiz de base - Académie",
+      "description": "Quiz de connaissances de base pour les candidats à l'académie de police",
+      "timeLimit": 10,
+      "passingScoreNormal": 80,
+      "passingScoreToWatch": 90,
+      "createdAt": "2025-08-04T12:24:02.389Z",
+      "updatedAt": "2025-08-04T17:41:24.800Z",
+      "questions": [
+        {
+          "id": "cmdxkevo60001u9qsddovb4bv",
+          "quizId": "cmdx30uad0000u9igxdn1qaj4",
+          "question": "Quelle est la mission principale de LSPA ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Formation en développement web\",\"isCorrect\":false},{\"text\":\"Formation en cybersécurité et systèmes\",\"isCorrect\":true},{\"text\":\"Formation en design graphique\",\"isCorrect\":false},{\"text\":\"Formation en marketing digital\",\"isCorrect\":false}]",
+          "correctAnswer": "Formation en cybersécurité et systèmes",
+          "points": 10,
+          "order": null
+        },
+        {
+          "id": "cmdxkevo90003u9qsrpqyk1ay",
+          "quizId": "cmdx30uad0000u9igxdn1qaj4",
+          "question": "Combien de temps dure la formation LSPA ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"6 mois\",\"isCorrect\":false},{\"text\":\"12 mois\",\"isCorrect\":true},{\"text\":\"18 mois\",\"isCorrect\":false},{\"text\":\"24 mois\",\"isCorrect\":false}]",
+          "correctAnswer": "12 mois",
+          "points": 10,
+          "order": null
+        },
+        {
+          "id": "cmdxkevoe0005u9qst9e9s1hl",
+          "quizId": "cmdx30uad0000u9igxdn1qaj4",
+          "question": "Quel est le principal objectif de la formation ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Obtenir un diplôme\",\"isCorrect\":false},{\"text\":\"Acquérir des compétences professionnelles\",\"isCorrect\":true},{\"text\":\"Passer du temps en entreprise\",\"isCorrect\":false},{\"text\":\"Rencontrer d'autres étudiants\",\"isCorrect\":false}]",
+          "correctAnswer": "Acquérir des compétences professionnelles",
+          "points": 15,
+          "order": null
+        },
+        {
+          "id": "cmdxkevoh0007u9qse2ya6rxf",
+          "quizId": "cmdx30uad0000u9igxdn1qaj4",
+          "question": "La formation LSPA est-elle en alternance ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Oui, en alternance\",\"isCorrect\":true},{\"text\":\"Non, en formation continue\",\"isCorrect\":false},{\"text\":\"Seulement les weekends\",\"isCorrect\":false},{\"text\":\"Formation à distance uniquement\",\"isCorrect\":false}]",
+          "correctAnswer": "Oui, en alternance",
+          "points": 10,
+          "order": null
+        },
+        {
+          "id": "cmdxkevok0009u9qsc5l1w2e0",
+          "quizId": "cmdx30uad0000u9igxdn1qaj4",
+          "question": "Quels sont les prérequis pour intégrer LSPA ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Bac +5 obligatoire\",\"isCorrect\":false},{\"text\":\"Expérience professionnelle de 10 ans\",\"isCorrect\":false},{\"text\":\"Motivation et aptitudes techniques\",\"isCorrect\":true},{\"text\":\"Certification préalable en informatique\",\"isCorrect\":false}]",
+          "correctAnswer": "Motivation et aptitudes techniques",
+          "points": 15,
+          "order": null
+        }
+      ]
+    },
+    {
+      "id": "cmdx30uak0006u9igcxa8fvj3",
+      "title": "Quiz avancé - Procédures",
+      "description": "Quiz pour les candidats ayant réussi le quiz de base",
+      "timeLimit": 10,
+      "passingScoreNormal": 85,
+      "passingScoreToWatch": 95,
+      "createdAt": "2025-08-04T12:24:02.396Z",
+      "updatedAt": "2025-08-04T18:45:51.699Z",
+      "questions": [
+        {
+          "id": "cmdxkevou000bu9qs090reb1u",
+          "quizId": "cmdx30uak0006u9igcxa8fvj3",
+          "question": "Quelle est la première étape d'une analyse de risque ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Identifier les menaces\",\"isCorrect\":true},{\"text\":\"Calculer les impacts\",\"isCorrect\":false},{\"text\":\"Mettre en place des contre-mesures\",\"isCorrect\":false},{\"text\":\"Former les utilisateurs\",\"isCorrect\":false}]",
+          "correctAnswer": "Identifier les menaces",
+          "points": 20,
+          "order": null
+        },
+        {
+          "id": "cmdxkevp0000du9qsjf1ltdb5",
+          "quizId": "cmdx30uak0006u9igcxa8fvj3",
+          "question": "Qu'est-ce qu'un firewall ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Un logiciel antivirus\",\"isCorrect\":false},{\"text\":\"Un système de filtrage réseau\",\"isCorrect\":true},{\"text\":\"Un système de sauvegarde\",\"isCorrect\":false},{\"text\":\"Un outil de monitoring\",\"isCorrect\":false}]",
+          "correctAnswer": "Un système de filtrage réseau",
+          "points": 15,
+          "order": null
+        },
+        {
+          "id": "cmdxkevp8000fu9qszlfpsa2c",
+          "quizId": "cmdx30uak0006u9igcxa8fvj3",
+          "question": "Que signifie CIA en cybersécurité ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Central Intelligence Agency\",\"isCorrect\":false},{\"text\":\"Confidentialité, Intégrité, Disponibilité\",\"isCorrect\":true},{\"text\":\"Computer Information Access\",\"isCorrect\":false},{\"text\":\"Cybersecurity Information Analysis\",\"isCorrect\":false}]",
+          "correctAnswer": "Confidentialité, Intégrité, Disponibilité",
+          "points": 20,
+          "order": null
+        },
+        {
+          "id": "cmdxkevpg000hu9qs4zh0y1pv",
+          "quizId": "cmdx30uak0006u9igcxa8fvj3",
+          "question": "Quelle est la différence entre un virus et un trojan ?",
+          "category": "QUIZ",
+          "options": "[{\"text\":\"Il n'y a aucune différence\",\"isCorrect\":false},{\"text\":\"Le virus se réplique, le trojan se cache\",\"isCorrect\":true},{\"text\":\"Le trojan est plus dangereux\",\"isCorrect\":false},{\"text\":\"Le virus attaque seulement Windows\",\"isCorrect\":false}]",
+          "correctAnswer": "Le virus se réplique, le trojan se cache",
+          "points": 25,
+          "order": null
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "cmdxkevo60001u9qsddovb4bv",
+      "quizId": "cmdx30uad0000u9igxdn1qaj4",
+      "question": "Quelle est la mission principale de LSPA ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Formation en développement web\",\"isCorrect\":false},{\"text\":\"Formation en cybersécurité et systèmes\",\"isCorrect\":true},{\"text\":\"Formation en design graphique\",\"isCorrect\":false},{\"text\":\"Formation en marketing digital\",\"isCorrect\":false}]",
+      "correctAnswer": "Formation en cybersécurité et systèmes",
+      "points": 10,
+      "order": null
+    },
+    {
+      "id": "cmdxkevo90003u9qsrpqyk1ay",
+      "quizId": "cmdx30uad0000u9igxdn1qaj4",
+      "question": "Combien de temps dure la formation LSPA ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"6 mois\",\"isCorrect\":false},{\"text\":\"12 mois\",\"isCorrect\":true},{\"text\":\"18 mois\",\"isCorrect\":false},{\"text\":\"24 mois\",\"isCorrect\":false}]",
+      "correctAnswer": "12 mois",
+      "points": 10,
+      "order": null
+    },
+    {
+      "id": "cmdxkevoe0005u9qst9e9s1hl",
+      "quizId": "cmdx30uad0000u9igxdn1qaj4",
+      "question": "Quel est le principal objectif de la formation ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Obtenir un diplôme\",\"isCorrect\":false},{\"text\":\"Acquérir des compétences professionnelles\",\"isCorrect\":true},{\"text\":\"Passer du temps en entreprise\",\"isCorrect\":false},{\"text\":\"Rencontrer d'autres étudiants\",\"isCorrect\":false}]",
+      "correctAnswer": "Acquérir des compétences professionnelles",
+      "points": 15,
+      "order": null
+    },
+    {
+      "id": "cmdxkevoh0007u9qse2ya6rxf",
+      "quizId": "cmdx30uad0000u9igxdn1qaj4",
+      "question": "La formation LSPA est-elle en alternance ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Oui, en alternance\",\"isCorrect\":true},{\"text\":\"Non, en formation continue\",\"isCorrect\":false},{\"text\":\"Seulement les weekends\",\"isCorrect\":false},{\"text\":\"Formation à distance uniquement\",\"isCorrect\":false}]",
+      "correctAnswer": "Oui, en alternance",
+      "points": 10,
+      "order": null
+    },
+    {
+      "id": "cmdxkevok0009u9qsc5l1w2e0",
+      "quizId": "cmdx30uad0000u9igxdn1qaj4",
+      "question": "Quels sont les prérequis pour intégrer LSPA ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Bac +5 obligatoire\",\"isCorrect\":false},{\"text\":\"Expérience professionnelle de 10 ans\",\"isCorrect\":false},{\"text\":\"Motivation et aptitudes techniques\",\"isCorrect\":true},{\"text\":\"Certification préalable en informatique\",\"isCorrect\":false}]",
+      "correctAnswer": "Motivation et aptitudes techniques",
+      "points": 15,
+      "order": null
+    },
+    {
+      "id": "cmdxkevou000bu9qs090reb1u",
+      "quizId": "cmdx30uak0006u9igcxa8fvj3",
+      "question": "Quelle est la première étape d'une analyse de risque ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Identifier les menaces\",\"isCorrect\":true},{\"text\":\"Calculer les impacts\",\"isCorrect\":false},{\"text\":\"Mettre en place des contre-mesures\",\"isCorrect\":false},{\"text\":\"Former les utilisateurs\",\"isCorrect\":false}]",
+      "correctAnswer": "Identifier les menaces",
+      "points": 20,
+      "order": null
+    },
+    {
+      "id": "cmdxkevp0000du9qsjf1ltdb5",
+      "quizId": "cmdx30uak0006u9igcxa8fvj3",
+      "question": "Qu'est-ce qu'un firewall ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Un logiciel antivirus\",\"isCorrect\":false},{\"text\":\"Un système de filtrage réseau\",\"isCorrect\":true},{\"text\":\"Un système de sauvegarde\",\"isCorrect\":false},{\"text\":\"Un outil de monitoring\",\"isCorrect\":false}]",
+      "correctAnswer": "Un système de filtrage réseau",
+      "points": 15,
+      "order": null
+    },
+    {
+      "id": "cmdxkevp8000fu9qszlfpsa2c",
+      "quizId": "cmdx30uak0006u9igcxa8fvj3",
+      "question": "Que signifie CIA en cybersécurité ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Central Intelligence Agency\",\"isCorrect\":false},{\"text\":\"Confidentialité, Intégrité, Disponibilité\",\"isCorrect\":true},{\"text\":\"Computer Information Access\",\"isCorrect\":false},{\"text\":\"Cybersecurity Information Analysis\",\"isCorrect\":false}]",
+      "correctAnswer": "Confidentialité, Intégrité, Disponibilité",
+      "points": 20,
+      "order": null
+    },
+    {
+      "id": "cmdxkevpg000hu9qs4zh0y1pv",
+      "quizId": "cmdx30uak0006u9igcxa8fvj3",
+      "question": "Quelle est la différence entre un virus et un trojan ?",
+      "category": "QUIZ",
+      "options": "[{\"text\":\"Il n'y a aucune différence\",\"isCorrect\":false},{\"text\":\"Le virus se réplique, le trojan se cache\",\"isCorrect\":true},{\"text\":\"Le trojan est plus dangereux\",\"isCorrect\":false},{\"text\":\"Le virus attaque seulement Windows\",\"isCorrect\":false}]",
+      "correctAnswer": "Le virus se réplique, le trojan se cache",
+      "points": 25,
+      "order": null
+    },
+    {
+      "id": "cmdyiuvws0000u94w6i52vvq1",
+      "quizId": null,
+      "question": "Pourquoi avez vous choisi de rejoindre le LSPD ?",
+      "category": "INTERVIEW",
+      "options": null,
+      "correctAnswer": "",
+      "points": 1,
+      "order": null
+    },
+    {
+      "id": "cmdyj3o9f0001u94wol9qjov5",
+      "quizId": null,
+      "question": "Comment réagiriez-vous si vous étiez insulté(e) ou provoqué(e) dans le cadre de votre travail ?",
+      "category": "INTERVIEW",
+      "options": null,
+      "correctAnswer": "",
+      "points": 1,
+      "order": null
+    },
+    {
+      "id": "cmdyj43zl0002u94w0vzt2uf6",
+      "quizId": null,
+      "question": "Comment gérez-vous un conflit avec un collègue ?",
+      "category": "INTERVIEW",
+      "options": null,
+      "correctAnswer": "",
+      "points": 1,
+      "order": null
+    },
+    {
+      "id": "cmdyj4oik0003u94w5hc78eg3",
+      "quizId": null,
+      "question": "Y a-t-il une limite à l’obéissance aux ordres ?",
+      "category": "INTERVIEW",
+      "options": null,
+      "correctAnswer": "",
+      "points": 1,
+      "order": null
+    },
+    {
+      "id": "cmdyj70390004u94wq8ltp62c",
+      "quizId": null,
+      "question": "Décrivez deux qualités et deux défauts personnels",
+      "category": "INTERVIEW",
+      "options": null,
+      "correctAnswer": "",
+      "points": 1,
+      "order": null
+    }
+  ],
+  "interviews": [
+    {
+      "id": "cmdyjjrip000du94wabpivkyy",
+      "sessionId": "cmdyjjefr0009u94wgmkv6cyk",
+      "candidateId": "cmdx2ppe20005u9d88jznvf47",
+      "interviewerId": "cmdwi0a4m0000u9lcb48mx0pl",
+      "status": "COMPLETED",
+      "conductedBy": "Administrateur LSPA",
+      "decision": "A_SURVEILLER",
+      "notes": "test",
+      "completedAt": "2025-08-05T12:55:56.845Z",
+      "createdAt": "2025-08-05T12:54:25.298Z",
+      "updatedAt": "2025-08-05T12:55:56.846Z"
+    }
+  ],
+  "quizAttempts": []
+}

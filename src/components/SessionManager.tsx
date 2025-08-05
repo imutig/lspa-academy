@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { modernDesign } from '../utils/modernDesign'
+import InterviewReportModal from './InterviewReportModal'
 
 interface Quiz {
   id: string
@@ -66,6 +67,8 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
   const [sessionCandidates, setSessionCandidates] = useState<Candidate[]>([])
   const [selectedQuizForAssignment, setSelectedQuizForAssignment] = useState('')
   const [isLoaded, setIsLoaded] = useState(false)
+  const [showInterviewReportModal, setShowInterviewReportModal] = useState(false)
+  const [selectedCandidateForReport, setSelectedCandidateForReport] = useState('')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -231,8 +234,8 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
   }
 
   const handleViewInterviewReport = (candidateId: string, sessionId: string) => {
-    // Redirection vers la page d'entretien en mode consultation
-    window.open(`/admin/interview?candidateId=${candidateId}&sessionId=${sessionId}&mode=view`, '_blank')
+    setSelectedCandidateForReport(candidateId)
+    setShowInterviewReportModal(true)
   }
 
   const handleViewCandidateQuizzes = (candidateId: string, sessionId: string) => {
@@ -1649,6 +1652,14 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
             </div>
           </div>
         )}
+
+        {/* Modal de rapport d'entretien */}
+        <InterviewReportModal
+          isOpen={showInterviewReportModal}
+          onClose={() => setShowInterviewReportModal(false)}
+          candidateId={selectedCandidateForReport}
+          sessionId={selectedSession}
+        />
       </div>
     </>
   )

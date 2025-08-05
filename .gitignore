@@ -48,6 +48,11 @@ next-env.d.ts
 *.db-journal
 
 # Backup files
+backup-data.json
+migration-backup-*.json
+
+# Production environment files
+.env.production.local
 *.bak
 *_backup.*
 *_old.*

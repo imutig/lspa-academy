@@ -51,6 +51,7 @@ export default function InterviewModal({
 }: InterviewModalProps) {
   const { data: session } = useSession()
   const [currentStep, setCurrentStep] = useState(1)
+  const [currentSituationIndex, setCurrentSituationIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])
   const [situations, setSituations] = useState<Situation[]>([])
@@ -159,11 +160,21 @@ export default function InterviewModal({
   }
 
   const nextStep = () => {
-    if (currentStep < 3) setCurrentStep(currentStep + 1)
+    if (currentStep === 2 && currentSituationIndex < situations.length - 1) {
+      setCurrentSituationIndex(currentSituationIndex + 1)
+    } else if (currentStep < 3) {
+      setCurrentStep(currentStep + 1)
+      if (currentStep === 1) setCurrentSituationIndex(0) // Reset situation index when entering situations
+    }
   }
 
   const prevStep = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1)
+    if (currentStep === 2 && currentSituationIndex > 0) {
+      setCurrentSituationIndex(currentSituationIndex - 1)
+    } else if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+      if (currentStep === 3) setCurrentSituationIndex(situations.length - 1) // Go to last situation when coming back from step 3
+    }
   }
 
   const getDecisionIcon = (decision: string) => {
@@ -400,148 +411,151 @@ export default function InterviewModal({
                 }}>
                   2
                 </span>
-                Mises en situation
+                Mises en situation ({currentSituationIndex + 1}/{situations.length})
               </h3>
               <p style={{ color: '#9ca3af', marginBottom: '32px' }}>
-                Présentez les situations suivantes au candidat et évaluez ses réponses.
+                Présentez la situation suivante au candidat et évaluez sa réponse.
               </p>
 
-              <div style={{ display: 'grid', gap: '32px' }}>
-                {situations.map((situation, index) => (
-                  <div key={situation.id} style={{
-                    background: 'rgba(31, 41, 55, 0.6)',
-                    border: '1px solid rgba(75, 85, 99, 0.3)',
-                    borderRadius: '12px',
-                    padding: '24px'
+              {situations.length > 0 && situations[currentSituationIndex] && (
+                <div style={{
+                  background: 'rgba(31, 41, 55, 0.6)',
+                  border: '1px solid rgba(75, 85, 99, 0.3)',
+                  borderRadius: '12px',
+                  padding: '24px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px',
+                    marginBottom: '20px'
                   }}>
-                    <div style={{
+                    <span style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
                       display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '16px',
-                      marginBottom: '20px'
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      flexShrink: 0
                     }}>
-                      <span style={{
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        color: '#10b981',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '600'
+                      S{currentSituationIndex + 1}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ color: 'white', fontSize: '18px', fontWeight: '600', margin: '0 0 12px 0' }}>
+                        {situations[currentSituationIndex].title}
+                      </h4>
+                      <p style={{ color: '#e5e7eb', fontSize: '14px', margin: '0 0 16px 0', lineHeight: '1.6' }}>
+                        {situations[currentSituationIndex].description}
+                      </p>
+                      <div style={{
+                        background: 'rgba(59, 130, 246, 0.05)',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        borderRadius: '8px',
+                        padding: '16px',
+                        marginBottom: '16px'
                       }}>
-                        S{index + 1}
-                      </span>
-                      <div style={{ flex: 1 }}>
-                        <h4 style={{ color: 'white', fontSize: '18px', fontWeight: '600', margin: '0 0 12px 0' }}>
-                          {situation.title}
-                        </h4>
-                        <p style={{ color: '#e5e7eb', fontSize: '14px', margin: '0 0 16px 0', lineHeight: '1.6' }}>
-                          {situation.description}
+                        <p style={{ color: '#93c5fd', fontSize: '14px', fontWeight: '500', margin: '0 0 8px 0' }}>
+                          Situation à présenter :
                         </p>
-                        <div style={{
-                          background: 'rgba(59, 130, 246, 0.05)',
-                          border: '1px solid rgba(59, 130, 246, 0.2)',
-                          borderRadius: '8px',
-                          padding: '16px',
-                          marginBottom: '16px'
-                        }}>
-                          <p style={{ color: '#93c5fd', fontSize: '14px', fontWeight: '500', margin: '0 0 8px 0' }}>
-                            Situation à présenter :
-                          </p>
-                          <p style={{ color: 'white', fontSize: '14px', margin: 0, lineHeight: '1.6' }}>
-                            {situation.description}
-                          </p>
-                        </div>
-                        <div style={{
-                          background: 'rgba(34, 197, 94, 0.05)',
-                          border: '1px solid rgba(34, 197, 94, 0.2)',
-                          borderRadius: '8px',
-                          padding: '16px'
-                        }}>
-                          <p style={{ color: '#86efac', fontSize: '14px', fontWeight: '500', margin: '0 0 8px 0' }}>
-                            Réponse attendue :
-                          </p>
-                          <p style={{ color: '#e5e7eb', fontSize: '14px', margin: 0, lineHeight: '1.6' }}>
-                            {situation.expectedResponse || situation.expectedBehavior || situation.correctAnswer || 'Réponse attendue non définie'}
-                          </p>
-                        </div>
+                        <p style={{ color: 'white', fontSize: '14px', margin: 0, lineHeight: '1.6' }}>
+                          {situations[currentSituationIndex].description}
+                        </p>
                       </div>
-                    </div>
-                    
-                    <div style={{ marginBottom: '16px' }}>
-                      <label style={{ color: 'white', fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block' }}>
-                        Réponse du candidat :
-                      </label>
-                      <textarea
-                        value={situationAnswers.find(sa => sa.situationId === situation.id)?.candidateAnswer || ''}
-                        onChange={(e) => updateSituationAnswer(
-                          situation.id, 
-                          e.target.value, 
-                          situationAnswers.find(sa => sa.situationId === situation.id)?.rating || 'MOYENNE'
-                        )}
-                        placeholder="Notez la réponse donnée par le candidat..."
-                        style={{
-                          width: '100%',
-                          minHeight: '100px',
-                          background: 'rgba(15, 23, 42, 0.8)',
-                          border: '1px solid rgba(75, 85, 99, 0.3)',
-                          borderRadius: '8px',
-                          padding: '12px',
-                          color: 'white',
-                          fontSize: '14px',
-                          resize: 'vertical',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ color: 'white', fontSize: '14px', fontWeight: '500', marginBottom: '12px', display: 'block' }}>
-                        Évaluation de la réponse :
-                      </label>
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        {['MAUVAISE', 'MOYENNE', 'BONNE'].map((rating) => (
-                          <button
-                            key={rating}
-                            onClick={() => updateSituationAnswer(
-                              situation.id,
-                              situationAnswers.find(sa => sa.situationId === situation.id)?.candidateAnswer || '',
-                              rating as 'MAUVAISE' | 'MOYENNE' | 'BONNE'
-                            )}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: '8px',
-                              border: '1px solid',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              background: situationAnswers.find(sa => sa.situationId === situation.id)?.rating === rating
-                                ? rating === 'BONNE' ? 'rgba(34, 197, 94, 0.2)' 
-                                : rating === 'MOYENNE' ? 'rgba(251, 146, 60, 0.2)'
-                                : 'rgba(239, 68, 68, 0.2)'
-                                : 'rgba(75, 85, 99, 0.1)',
-                              borderColor: situationAnswers.find(sa => sa.situationId === situation.id)?.rating === rating
-                                ? rating === 'BONNE' ? '#22c55e' 
-                                : rating === 'MOYENNE' ? '#fb923c'
-                                : '#ef4444'
-                                : 'rgba(75, 85, 99, 0.3)',
-                              color: situationAnswers.find(sa => sa.situationId === situation.id)?.rating === rating
-                                ? rating === 'BONNE' ? '#22c55e' 
-                                : rating === 'MOYENNE' ? '#fb923c'
-                                : '#ef4444'
-                                : '#9ca3af'
-                            }}
-                          >
-                            {rating === 'BONNE' ? '✅ Bonne réponse' : 
-                             rating === 'MOYENNE' ? '⚠️ Réponse moyenne' : 
-                             '❌ Mauvaise réponse'}
-                          </button>
-                        ))}
+                      <div style={{
+                        background: 'rgba(34, 197, 94, 0.05)',
+                        border: '1px solid rgba(34, 197, 94, 0.2)',
+                        borderRadius: '8px',
+                        padding: '16px'
+                      }}>
+                        <p style={{ color: '#86efac', fontSize: '14px', fontWeight: '500', margin: '0 0 8px 0' }}>
+                          Réponse attendue :
+                        </p>
+                        <p style={{ color: '#e5e7eb', fontSize: '14px', margin: 0, lineHeight: '1.6' }}>
+                          {situations[currentSituationIndex].expectedResponse || situations[currentSituationIndex].expectedBehavior || situations[currentSituationIndex].correctAnswer || 'Réponse attendue non définie'}
+                        </p>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ color: 'white', fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block' }}>
+                      Réponse du candidat :
+                    </label>
+                    <textarea
+                      value={situationAnswers.find(sa => sa.situationId === situations[currentSituationIndex].id)?.candidateAnswer || ''}
+                      onChange={(e) => updateSituationAnswer(
+                        situations[currentSituationIndex].id, 
+                        e.target.value, 
+                        situationAnswers.find(sa => sa.situationId === situations[currentSituationIndex].id)?.rating || 'MOYENNE'
+                      )}
+                      placeholder="Notez la réponse donnée par le candidat..."
+                      style={{
+                        width: '100%',
+                        minHeight: '100px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '1px solid rgba(75, 85, 99, 0.3)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: 'white',
+                        fontSize: '14px',
+                        resize: 'vertical',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ color: 'white', fontSize: '14px', fontWeight: '500', marginBottom: '12px', display: 'block' }}>
+                      Évaluation de la réponse :
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      {['MAUVAISE', 'MOYENNE', 'BONNE'].map((rating) => (
+                        <button
+                          key={rating}
+                          onClick={() => updateSituationAnswer(
+                            situations[currentSituationIndex].id,
+                            situationAnswers.find(sa => sa.situationId === situations[currentSituationIndex].id)?.candidateAnswer || '',
+                            rating as 'MAUVAISE' | 'MOYENNE' | 'BONNE'
+                          )}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            background: situationAnswers.find(sa => sa.situationId === situations[currentSituationIndex].id)?.rating === rating
+                              ? rating === 'BONNE' ? 'rgba(34, 197, 94, 0.2)' 
+                              : rating === 'MOYENNE' ? 'rgba(251, 146, 60, 0.2)'
+                              : 'rgba(239, 68, 68, 0.2)'
+                              : 'rgba(75, 85, 99, 0.1)',
+                            borderColor: situationAnswers.find(sa => sa.situationId === situations[currentSituationIndex].id)?.rating === rating
+                              ? rating === 'BONNE' ? '#22c55e' 
+                              : rating === 'MOYENNE' ? '#fb923c'
+                              : '#ef4444'
+                              : 'rgba(75, 85, 99, 0.3)',
+                            color: situationAnswers.find(sa => sa.situationId === situations[currentSituationIndex].id)?.rating === rating
+                              ? rating === 'BONNE' ? '#22c55e' 
+                              : rating === 'MOYENNE' ? '#fb923c'
+                              : '#ef4444'
+                              : '#9ca3af'
+                          }}
+                        >
+                          {rating === 'BONNE' ? '✅ Bonne réponse' : 
+                           rating === 'MOYENNE' ? '⚠️ Réponse moyenne' : 
+                           '❌ Mauvaise réponse'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -709,24 +723,26 @@ export default function InterviewModal({
         }}>
           <button
             onClick={prevStep}
-            disabled={currentStep === 1}
+            disabled={currentStep === 1 && currentSituationIndex === 0}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               padding: '12px 20px',
-              background: currentStep === 1 ? 'rgba(75, 85, 99, 0.3)' : 'rgba(75, 85, 99, 0.6)',
-              color: currentStep === 1 ? '#6b7280' : 'white',
+              background: (currentStep === 1 && currentSituationIndex === 0) ? 'rgba(75, 85, 99, 0.3)' : 'rgba(75, 85, 99, 0.6)',
+              color: (currentStep === 1 && currentSituationIndex === 0) ? '#6b7280' : 'white',
               border: 'none',
               borderRadius: '8px',
               fontSize: '14px',
               fontWeight: '500',
-              cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
+              cursor: (currentStep === 1 && currentSituationIndex === 0) ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s ease'
             }}
           >
             <ChevronLeft style={{ width: '16px', height: '16px' }} />
-            Précédent
+            {currentStep === 2 && currentSituationIndex > 0 
+              ? 'Situation précédente' 
+              : 'Précédent'}
           </button>
 
           <div style={{
@@ -748,7 +764,7 @@ export default function InterviewModal({
             ))}
           </div>
 
-          {currentStep < 3 ? (
+          {currentStep < 3 || (currentStep === 2 && currentSituationIndex < situations.length - 1) ? (
             <button
               onClick={nextStep}
               style={{
@@ -772,7 +788,11 @@ export default function InterviewModal({
                 e.currentTarget.style.transform = 'translateY(0)'
               }}
             >
-              Suivant
+              {currentStep === 2 && currentSituationIndex < situations.length - 1 
+                ? 'Situation suivante' 
+                : currentStep === 1 
+                ? 'Mises en situation' 
+                : 'Finaliser'}
               <ChevronRight style={{ width: '16px', height: '16px' }} />
             </button>
           ) : (

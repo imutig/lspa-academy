@@ -24,6 +24,14 @@ export async function GET(
         sessionId: id
       },
       include: {
+        candidate: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true
+          }
+        },
         interviewQuestions: {
           include: {
             question: true
@@ -46,20 +54,29 @@ export async function GET(
       id: interview.id,
       status: interview.status,
       conductedBy: interview.conductedBy,
-      completedAt: interview.completedAt,
+      createdAt: interview.createdAt,
+      updatedAt: interview.updatedAt,
       finalDecision: interview.decision,
       additionalNotes: interview.notes,
+      candidate: interview.candidate,
       questions: interview.interviewQuestions.map((iq: any) => ({
-        question: iq.question.question,
+        questionId: iq.questionId,
         answer: iq.answer,
-        rating: iq.rating
+        question: {
+          id: iq.question.id,
+          title: iq.question.title || iq.question.question,
+          description: iq.question.description
+        }
       })),
       situations: interview.interviewSituations.map((is: any) => ({
-        title: is.situation.title,
-        description: is.situation.description,
-        expectedResponse: is.situation.expectedResponse,
-        candidateResponse: is.candidateResponse,
-        evaluation: is.evaluation
+        situationId: is.situationId,
+        candidateAnswer: is.candidateResponse,
+        rating: is.evaluation,
+        situation: {
+          id: is.situation.id,
+          title: is.situation.title,
+          description: is.situation.description
+        }
       }))
     }
 
