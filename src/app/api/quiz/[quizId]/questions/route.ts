@@ -3,24 +3,18 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-interface RouteParams {
-  params: Promise<{
-    quizId: string
-  }>
-}
-
 // GET - Récupérer les questions d'un quiz
 export async function GET(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: Promise<{ quizId: string }> }
 ) {
   try {
+    const { quizId } = await params
+    
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
-
-    const { quizId } = await params
 
     const questions = await prisma.question.findMany({
       where: {
@@ -44,7 +38,7 @@ export async function GET(
 // POST - Créer une nouvelle question
 export async function POST(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: { params: Promise<{ quizId: string }> }
 ) {
   const { quizId } = await params;
   try {
