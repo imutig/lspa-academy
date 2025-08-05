@@ -5,8 +5,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     
@@ -25,7 +26,7 @@ export async function DELETE(
       )
     }
 
-    const sessionQuizId = params.id
+    const sessionQuizId = id
 
     // Récupérer les infos avant suppression pour le log
     const sessionQuiz = await prisma.sessionQuiz.findUnique({

@@ -3,10 +3,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+interface RouteParams {
+  params: Promise<{
+    quizId: string
+  }>
+}
+
 // GET - Récupérer les questions d'un quiz
 export async function GET(
   request: NextRequest,
-  { params }: { params: { quizId: string } }
+  { params }: RouteParams
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -14,9 +20,11 @@ export async function GET(
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
+    const { quizId } = await params
+
     const questions = await prisma.question.findMany({
       where: {
-        quizId: params.quizId
+        quizId: quizId
       },
       orderBy: {
         order: 'asc'
@@ -36,8 +44,9 @@ export async function GET(
 // POST - Créer une nouvelle question
 export async function POST(
   request: NextRequest,
-  { params }: { params: { quizId: string } }
+  { params }: { params: Promise<{ quizId: string }> }
 ) {
+  const { quizId } = await params;
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -58,7 +67,7 @@ export async function POST(
 
     // Vérifier que le quiz existe
     const quiz = await prisma.quiz.findUnique({
-      where: { id: params.quizId }
+      where: { id: quizId }
     })
 
     if (!quiz) {
@@ -67,7 +76,7 @@ export async function POST(
 
     const newQuestion = await prisma.question.create({
       data: {
-        quizId: params.quizId,
+        quizId: quizId,
         question,
         options,
         correctAnswer,

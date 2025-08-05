@@ -1,5 +1,8 @@
 'use client'
 
+// Force dynamic rendering pour éviter les erreurs de build avec useSearchParams
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'

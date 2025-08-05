@@ -3,11 +3,42 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ quizId: string }> }
+) {
+  const { quizId } = await params;
+  
+  try {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    })
+
+    if (!quiz) {
+      return NextResponse.json({ error: 'Quiz non trouvé' }, { status: 404 })
+    }
+
+    return NextResponse.json(quiz)
+  } catch (error) {
+    console.error('Erreur lors de la récupération du quiz:', error)
+    return NextResponse.json(
+      { error: 'Erreur serveur' },
+      { status: 500 }
+    )
+  }
+}
+
 // PATCH - Mettre à jour un quiz
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { quizId: string } }
+  { params }: { params: Promise<{ quizId: string }> }
 ) {
+  const { quizId } = await params;
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -24,7 +55,7 @@ export async function PATCH(
 
     // Vérifier que le quiz existe
     const existingQuiz = await prisma.quiz.findUnique({
-      where: { id: params.quizId }
+      where: { id: quizId }
     })
 
     if (!existingQuiz) {
@@ -32,7 +63,7 @@ export async function PATCH(
     }
 
     const updatedQuiz = await prisma.quiz.update({
-      where: { id: params.quizId },
+      where: { id: quizId },
       data: {
         ...(title && { title }),
         ...(description !== undefined && { description }),
