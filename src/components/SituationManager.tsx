@@ -6,32 +6,75 @@ interface Situation {
   id: string
   title: string
   description: string
-  scenario: string
-  expectedResponse: string
+  expectedResponse?: string
   difficulty: 'FACILE' | 'MOYEN' | 'DIFFICILE'
-  category: string
-  isActive: boolean
+  category?: string
   createdAt: string
 }
 
 export default function SituationManager() {
   const [situations, setSituations] = useState<Situation[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(() => {
+    // Persistance de l'état du formulaire de création dans sessionStorage
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('situation-create-form-open') === 'true'
+    }
+    return false
+  })
   const [editingSituation, setEditingSituation] = useState<Situation | null>(null)
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    scenario: '',
-    expectedResponse: '',
-    difficulty: 'MOYEN' as 'FACILE' | 'MOYEN' | 'DIFFICILE',
-    category: '',
-    isActive: true
+  const [formData, setFormData] = useState(() => {
+    // Charger les données sauvegardées depuis sessionStorage
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('situation-create-form-data')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch (e) {
+          console.error('Erreur lors du chargement des données du formulaire:', e)
+        }
+      }
+    }
+    return {
+      title: '',
+      description: '',
+      expectedResponse: '',
+      difficulty: 'MOYEN' as 'FACILE' | 'MOYEN' | 'DIFFICILE',
+      category: ''
+    }
   })
 
   useEffect(() => {
     fetchSituations()
   }, [])
+
+  // Helper pour gérer la persistance de l'état du formulaire de création
+  const setShowFormPersistent = (show: boolean) => {
+    setShowForm(show)
+    if (typeof window !== 'undefined') {
+      if (show) {
+        sessionStorage.setItem('situation-create-form-open', 'true')
+      } else {
+        sessionStorage.removeItem('situation-create-form-open')
+        sessionStorage.removeItem('situation-create-form-data') // Nettoyer les données aussi
+      }
+    }
+  }
+
+  // Helper pour sauvegarder automatiquement les données du formulaire
+  const setFormDataPersistent = (data: any) => {
+    setFormData(data)
+    if (typeof window !== 'undefined' && showForm) {
+      sessionStorage.setItem('situation-create-form-data', JSON.stringify(data))
+    }
+  }
+
+  // Sauvegarder automatiquement quand formData change et que le formulaire est ouvert
+  useEffect(() => {
+    if (typeof window !== 'undefined' && showForm && (formData.title || formData.description)) {
+      sessionStorage.setItem('situation-create-form-data', JSON.stringify(formData))
+    }
+  }, [formData, showForm])
 
   const fetchSituations = async () => {
     try {
@@ -53,8 +96,8 @@ export default function SituationManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.title.trim() || !formData.description.trim() || !formData.scenario.trim()) {
-      alert('Veuillez remplir tous les champs obligatoires')
+    if (!formData.title.trim() || !formData.description.trim()) {
+      alert('Veuillez remplir au minimum le titre et la description')
       return
     }
 
@@ -115,35 +158,32 @@ export default function SituationManager() {
     setFormData({
       title: situation.title,
       description: situation.description,
-      scenario: situation.scenario,
-      expectedResponse: situation.expectedResponse,
+      expectedResponse: situation.expectedResponse || '',
       difficulty: situation.difficulty,
-      category: situation.category,
-      isActive: situation.isActive
+      category: situation.category || ''
     })
-    setShowForm(true)
+    setShowFormPersistent(true)
   }
 
   const resetForm = () => {
     setFormData({
       title: '',
       description: '',
-      scenario: '',
       expectedResponse: '',
       difficulty: 'MOYEN',
-      category: '',
-      isActive: true
+      category: ''
     })
     setEditingSituation(null)
-    setShowForm(false)
+    setShowFormPersistent(false)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    setFormData(prev => ({
-      ...prev,
+    const newData = {
+      ...formData,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }))
+    }
+    setFormDataPersistent(newData)
   }
 
   const getDifficultyColor = (difficulty: string) => {
@@ -201,7 +241,7 @@ export default function SituationManager() {
         }}>Gestion des Mises en Situation</h2>
         
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => setShowFormPersistent(!showForm)}
           style={{
             padding: '12px 24px',
             background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
@@ -306,23 +346,6 @@ export default function SituationManager() {
                   <option value="DIFFICILE">Difficile</option>
                 </select>
               </div>
-
-              <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px'}}>
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  checked={formData.isActive}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    accentColor: '#3b82f6'
-                  }}
-                />
-                <label style={{color: '#d1d5db', fontSize: '14px'}}>
-                  Situation active
-                </label>
-              </div>
             </div>
 
             <div>
@@ -350,38 +373,14 @@ export default function SituationManager() {
 
             <div>
               <label style={{color: '#d1d5db', fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block'}}>
-                Scénario *
-              </label>
-              <textarea
-                name="scenario"
-                value={formData.scenario}
-                onChange={handleInputChange}
-                required
-                rows={4}
-                placeholder="Décrivez en détail la situation..."
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: 'rgba(55, 65, 81, 0.8)',
-                  border: '1px solid rgba(75, 85, 99, 0.5)',
-                  borderRadius: '6px',
-                  color: 'white',
-                  fontSize: '14px',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{color: '#d1d5db', fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block'}}>
                 Réponse attendue
               </label>
               <textarea
                 name="expectedResponse"
                 value={formData.expectedResponse}
                 onChange={handleInputChange}
-                rows={3}
-                placeholder="Réponse ou comportement attendu (optionnel)..."
+                rows={4}
+                placeholder="Décrivez la réponse ou le comportement attendu du candidat..."
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -489,18 +488,7 @@ export default function SituationManager() {
                     </span>
                   )}
 
-                  {!situation.isActive && (
-                    <span style={{
-                      background: 'rgba(107, 114, 128, 0.2)',
-                      color: '#9ca3af',
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '500'
-                    }}>
-                      Inactif
-                    </span>
-                  )}
+
                 </div>
                 
                 <p style={{
@@ -554,30 +542,6 @@ export default function SituationManager() {
                 </button>
               </div>
             </div>
-
-            {situation.scenario && (
-              <div style={{
-                background: 'rgba(55, 65, 81, 0.5)',
-                border: '1px solid rgba(75, 85, 99, 0.3)',
-                borderRadius: '8px',
-                padding: '12px',
-                marginTop: '12px'
-              }}>
-                <h4 style={{
-                  color: '#e5e7eb',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  margin: '0 0 8px 0'
-                }}>Scénario:</h4>
-                <p style={{
-                  color: '#d1d5db',
-                  fontSize: '13px',
-                  margin: 0,
-                  lineHeight: 1.4,
-                  whiteSpace: 'pre-wrap'
-                }}>{situation.scenario}</p>
-              </div>
-            )}
 
             {situation.expectedResponse && (
               <div style={{

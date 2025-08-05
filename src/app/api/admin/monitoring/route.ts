@@ -36,7 +36,14 @@ export async function GET(request: NextRequest) {
                   select: {
                     id: true,
                     title: true,
-                    timeLimit: true
+                    timeLimit: true,
+                    questions: {
+                      select: {
+                        id: true,
+                        options: true,
+                        correctAnswer: true
+                      }
+                    }
                   }
                 }
               },
@@ -71,11 +78,13 @@ export async function GET(request: NextRequest) {
       const quizAttempts = candidate.user.quizAttempts
       const interview = interviews.find(i => i.candidateId === candidate.user.id)
       
-      const activeQuiz = quizAttempts.find(attempt => 
-        !attempt.completed && 
-        attempt.startedAt && 
-        new Date(attempt.startedAt.getTime() + (attempt.quiz.timeLimit * 1000)) > new Date()
-      )
+      const activeQuiz = quizAttempts.find(attempt => {
+        // Quiz actif = commencé mais pas terminé
+        return !attempt.completed && attempt.startedAt
+      })
+
+      // Dernier quiz terminé seulement
+      const lastCompletedQuiz = quizAttempts.find(attempt => attempt.completed)
 
       return {
         candidateId: candidate.user.id,
@@ -94,19 +103,108 @@ export async function GET(request: NextRequest) {
           quizId: activeQuiz.quizId,
           quizTitle: activeQuiz.quiz.title,
           startedAt: activeQuiz.startedAt,
-          timeRemaining: Math.max(0, Math.floor(
-            (activeQuiz.startedAt.getTime() + (activeQuiz.quiz.timeLimit * 1000) - Date.now()) / 1000
-          )),
-          currentScore: activeQuiz.score || 0,
-          questionsAnswered: activeQuiz.answers ? Object.keys(activeQuiz.answers).length : 0,
+          timeRemaining: (() => {
+            // Utiliser le startTime sauvegardé dans answers s'il existe, sinon startedAt
+            const answers = activeQuiz.answers as any
+            const actualStartTime = answers?.startTime ? new Date(answers.startTime) : activeQuiz.startedAt
+            const elapsedTime = Date.now() - actualStartTime.getTime()
+            const totalTimeMs = activeQuiz.quiz.timeLimit * 1000
+            const remainingMs = Math.max(0, totalTimeMs - elapsedTime)
+            return Math.floor(remainingMs / 1000)
+          })(),
+          currentScore: (() => {
+            // Calculer le score en temps réel basé sur les réponses actuelles
+            const answers = activeQuiz.answers as any
+            if (!answers) return 0
+            
+            // Pour les quiz en cours, les réponses sont dans answers.userAnswers
+            // Pour les quiz terminés, les réponses sont directement dans answers
+            const userAnswers = answers.userAnswers || answers
+            if (!userAnswers || Object.keys(userAnswers).length === 0) return 0
+            
+            let correctAnswers = 0
+            let totalAnswered = 0
+            
+            // Parcourir les questions du quiz
+            activeQuiz.quiz.questions.forEach((question: any) => {
+              const userAnswerIndex = userAnswers[question.id]
+              
+              if (userAnswerIndex !== undefined && userAnswerIndex !== null) {
+                totalAnswered++
+                
+                // Convertir en number si c'est une string
+                const userAnswerIndexNum = typeof userAnswerIndex === 'string' ? parseInt(userAnswerIndex, 10) : userAnswerIndex
+                
+                if (!isNaN(userAnswerIndexNum)) {
+                  // Parse les options pour trouver le texte de la réponse utilisateur
+                  const options = JSON.parse(question.options)
+                  if (options[userAnswerIndexNum]) {
+                    const userAnswerText = options[userAnswerIndexNum].text
+                    if (userAnswerText === question.correctAnswer) {
+                      correctAnswers++
+                    }
+                  }
+                }
+              }
+            })
+            
+            return correctAnswers
+          })(),
+          questionsAnswered: (() => {
+            const answers = activeQuiz.answers as any
+            if (!answers) return 0
+            
+            // Pour les quiz en cours, les réponses sont dans answers.userAnswers
+            const userAnswers = answers.userAnswers || answers
+            if (!userAnswers) return 0
+            
+            // Compter seulement les vraies réponses (pas les métadonnées)
+            const realAnswers = Object.keys(userAnswers).filter(key => 
+              key !== 'startTime' && 
+              key !== 'currentQuestionIndex' && 
+              key !== 'timeLeft' && 
+              key !== 'lastSaveTime'
+            )
+            return realAnswers.length
+          })(),
           lastActivity: activeQuiz.startedAt
         } : null,
-        lastQuizAttempt: quizAttempts[0] ? {
-          quizTitle: quizAttempts[0].quiz.title,
-          completed: quizAttempts[0].completed,
-          score: quizAttempts[0].score,
-          completedAt: quizAttempts[0].completedAt,
-          startedAt: quizAttempts[0].startedAt
+        lastQuizAttempt: lastCompletedQuiz ? {
+          quizTitle: lastCompletedQuiz.quiz.title,
+          completed: lastCompletedQuiz.completed,
+          score: lastCompletedQuiz.score,
+          correctAnswersPercentage: (() => {
+            const answers = lastCompletedQuiz.answers as any
+            const totalQuestions = lastCompletedQuiz.quiz.questions.length
+            if (!answers || totalQuestions === 0) return 0
+            
+            let correctCount = 0
+            
+            // Parcourir les questions du quiz pour calculer le score
+            lastCompletedQuiz.quiz.questions.forEach((question: any) => {
+              const userAnswerIndex = answers[question.id]
+              
+              if (userAnswerIndex !== undefined && userAnswerIndex !== null) {
+                // Convertir en number si c'est une string
+                const userAnswerIndexNum = typeof userAnswerIndex === 'string' ? parseInt(userAnswerIndex, 10) : userAnswerIndex
+                
+                if (!isNaN(userAnswerIndexNum)) {
+                  // Parse les options pour trouver le texte de la réponse utilisateur
+                  const options = JSON.parse(question.options)
+                  if (options[userAnswerIndexNum]) {
+                    const userAnswerText = options[userAnswerIndexNum].text
+                    if (userAnswerText === question.correctAnswer) {
+                      correctCount++
+                    }
+                  }
+                }
+              }
+            })
+            
+            return Math.round((correctCount / totalQuestions) * 100)
+          })(),
+          completedAt: lastCompletedQuiz.completedAt,
+          startedAt: lastCompletedQuiz.startedAt
         } : null,
         totalQuizAttempts: quizAttempts.length
       }

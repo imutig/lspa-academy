@@ -57,28 +57,94 @@ export default function QuizManager() {
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<{[key: string]: string}>({})
+  const [currentScore, setCurrentScore] = useState({ correct: 0, total: 0, percentage: 0, totalQuestions: 0 })
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [quizStartTime, setQuizStartTime] = useState<number | null>(null)
   const [showResults, setShowResults] = useState(false)
   const [results, setResults] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(() => {
+    // Persistance de l'état du formulaire de création dans sessionStorage
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('quiz-create-form-open') === 'true'
+    }
+    return false
+  })
   const [isLoaded, setIsLoaded] = useState(false)
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [quizProgress, setQuizProgress] = useState<{[key: string]: any}>({})
   const [isResuming, setIsResuming] = useState(false)
+  const [interviewStatus, setInterviewStatus] = useState<{
+    canAccessQuizzes: boolean
+    interviewStatus: string
+    message: string | null
+  }>({
+    canAccessQuizzes: false,
+    interviewStatus: 'NONE',
+    message: null
+  })
 
-  const [newQuiz, setNewQuiz] = useState({
-    title: '',
-    description: '',
-    timeLimit: '',
-    passingScoreNormal: '80',
-    passingScoreToWatch: '90',
-    questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
+  const [newQuiz, setNewQuiz] = useState(() => {
+    // Charger les données sauvegardées depuis sessionStorage
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('quiz-create-form-data')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch (e) {
+          console.error('Erreur lors du chargement des données du formulaire:', e)
+        }
+      }
+    }
+    return {
+      title: '',
+      description: '',
+      timeLimit: '',
+      passingScoreNormal: '80',
+      passingScoreToWatch: '90',
+      questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
+    }
   })
 
   useEffect(() => {
+    console.log('📊 currentScore state changed:', currentScore)
+  }, [currentScore])
+
+  // Helper pour gérer la persistance de l'état du formulaire de création
+  const setShowCreateFormPersistent = (show: boolean) => {
+    setShowCreateForm(show)
+    if (typeof window !== 'undefined') {
+      if (show) {
+        sessionStorage.setItem('quiz-create-form-open', 'true')
+      } else {
+        sessionStorage.removeItem('quiz-create-form-open')
+        sessionStorage.removeItem('quiz-create-form-data') // Nettoyer les données aussi
+      }
+    }
+  }
+
+  // Helper pour sauvegarder automatiquement les données du formulaire
+  const setNewQuizPersistent = (quiz: any) => {
+    setNewQuiz(quiz)
+    if (typeof window !== 'undefined' && showCreateForm) {
+      sessionStorage.setItem('quiz-create-form-data', JSON.stringify(quiz))
+    }
+  }
+
+  // Sauvegarder automatiquement quand newQuiz change et que le formulaire est ouvert
+  useEffect(() => {
+    if (typeof window !== 'undefined' && showCreateForm && (newQuiz.title || newQuiz.description)) {
+      sessionStorage.setItem('quiz-create-form-data', JSON.stringify(newQuiz))
+    }
+  }, [newQuiz, showCreateForm])
+
+  useEffect(() => {
+    // Vérifier le statut de l'entretien pour les candidats
+    if (session?.user.role === 'CANDIDAT') {
+      checkInterviewStatus()
+    }
+    
     fetchQuizzes()
     if (session?.user.role === 'CANDIDAT') {
       fetchAttempts()
@@ -86,6 +152,18 @@ export default function QuizManager() {
     }
     setTimeout(() => setIsLoaded(true), 100)
   }, [session])
+
+  const checkInterviewStatus = async () => {
+    try {
+      const response = await fetch('/api/candidate/interview-status')
+      if (response.ok) {
+        const statusData = await response.json()
+        setInterviewStatus(statusData)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du statut d\'entretien:', error)
+    }
+  }
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -267,6 +345,7 @@ export default function QuizManager() {
         setActiveQuiz(quiz)
         setCurrentQuestionIndex(0)
         setAnswers({})
+        setCurrentScore({ correct: 0, total: 0, percentage: 0, totalQuestions: quiz.questions.length })
         setQuizStartTime(Date.now())
         if (quiz.timeLimit) {
           setTimeLeft(quiz.timeLimit * 60)
@@ -305,6 +384,7 @@ export default function QuizManager() {
         setActiveQuiz(fullQuiz)
         setCurrentQuestionIndex(0)
         setAnswers({})
+        setCurrentScore({ correct: 0, total: 0, percentage: 0, totalQuestions: fullQuiz.questions.length })
         setQuizStartTime(Date.now())
         if (fullQuiz.timeLimit) {
           setTimeLeft(fullQuiz.timeLimit * 60) // Convert minutes to seconds
@@ -336,6 +416,12 @@ export default function QuizManager() {
         setTimeLeft(progress.timeLeft)
         setShowResults(false)
         setIsResuming(false)
+        
+        // Calculer le score après avoir mis à jour activeQuiz
+        setTimeout(() => {
+          const resumeScore = calculateScoreWithAnswers(progress.answers)
+          setCurrentScore(resumeScore)
+        }, 100)
       }
     } catch (error) {
       console.error('Erreur lors de la reprise du quiz:', error)
@@ -344,9 +430,60 @@ export default function QuizManager() {
     }
   }
 
+  // Calculer le score avec des réponses spécifiques (pour éviter les problèmes de state async)
+  const calculateScoreWithAnswers = (answersToUse: {[key: string]: string}) => {
+    if (!activeQuiz || !activeQuiz.questions) {
+      return { correct: 0, total: 0, percentage: 0, totalQuestions: 0 }
+    }
+    
+    let correctAnswers = 0
+    let totalAnswered = 0
+    
+    activeQuiz.questions.forEach((question, questionIndex) => {
+      const userAnswerIndex = answersToUse[question.id]
+      
+      if (userAnswerIndex !== undefined && userAnswerIndex !== null) {
+        totalAnswered++
+        
+        // Utiliser la même logique que le backend
+        const userAnswerIndexNum = typeof userAnswerIndex === 'string' ? parseInt(userAnswerIndex, 10) : userAnswerIndex
+        
+        if (!isNaN(userAnswerIndexNum) && question.options && question.options[userAnswerIndexNum]) {
+          // L'API retourne les options comme un tableau de strings
+          const userAnswerText = question.options[userAnswerIndexNum]
+          const isCorrect = userAnswerText === question.correctAnswer
+          
+          if (isCorrect) {
+            correctAnswers++
+          }
+        }
+      }
+    })
+    
+    const percentage = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0
+    
+    return { 
+      correct: correctAnswers, 
+      total: totalAnswered, 
+      totalQuestions: activeQuiz.questions.length,
+      percentage 
+    }
+  }
+
   const handleAnswer = (questionId: string, answer: string) => {
+    console.log('🎯 Answer selected:', { questionId, answer })
+    
     const newAnswers = { ...answers, [questionId]: answer }
     setAnswers(newAnswers)
+    
+    // Calculer le score immédiatement avec les nouvelles réponses
+    if (activeQuiz?.questions) {
+      const immediateScore = calculateScoreWithAnswers(newAnswers)
+      console.log('🏆 Score calculated:', `${immediateScore.correct}/${immediateScore.total} (${immediateScore.percentage}%)`)
+      console.log('🎯 Before setCurrentScore:', currentScore)
+      setCurrentScore(immediateScore) // Mettre à jour l'état du score
+      console.log('� After setCurrentScore called with:', immediateScore)
+    }
     
     // Sauvegarder immédiatement quand une réponse est donnée
     if (session?.user.role === 'CANDIDAT') {
@@ -432,15 +569,16 @@ export default function QuizManager() {
       })
 
       if (response.ok) {
-        setShowCreateForm(false)
-        setNewQuiz({
+        setShowCreateFormPersistent(false)
+        const resetQuiz = {
           title: '',
           description: '',
           timeLimit: '',
           passingScoreNormal: '80',
           passingScoreToWatch: '90',
           questions: [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
-        })
+        }
+        setNewQuizPersistent(resetQuiz)
         fetchQuizzes()
       }
     } catch (error) {
@@ -480,7 +618,7 @@ export default function QuizManager() {
       })) || [{ question: '', options: ['', '', '', ''], correctAnswer: '0', points: '1' }]
     })
     setShowEditForm(true)
-    setShowCreateForm(false)
+    setShowCreateFormPersistent(false)
   }
 
   const updateQuiz = async () => {
@@ -540,6 +678,46 @@ export default function QuizManager() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Calculer le score actuel basé sur les réponses données
+  const getCurrentScore = () => {
+    if (!activeQuiz || !activeQuiz.questions) {
+      return { correct: 0, total: 0, percentage: 0, totalQuestions: 0 }
+    }
+    
+    let correctAnswers = 0
+    let totalAnswered = 0
+    
+    activeQuiz.questions.forEach((question, questionIndex) => {
+      const userAnswerIndex = answers[question.id]
+      
+      if (userAnswerIndex !== undefined && userAnswerIndex !== null) {
+        totalAnswered++
+        
+        // Utiliser la même logique que le backend
+        const userAnswerIndexNum = typeof userAnswerIndex === 'string' ? parseInt(userAnswerIndex, 10) : userAnswerIndex
+        
+        if (!isNaN(userAnswerIndexNum) && question.options && question.options[userAnswerIndexNum]) {
+          // L'API retourne les options comme un tableau de strings
+          const userAnswerText = question.options[userAnswerIndexNum]
+          const isCorrect = userAnswerText === question.correctAnswer
+          
+          if (isCorrect) {
+            correctAnswers++
+          }
+        }
+      }
+    })
+    
+    const percentage = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0
+    
+    return { 
+      correct: correctAnswers, 
+      total: totalAnswered, 
+      totalQuestions: activeQuiz.questions.length,
+      percentage 
+    }
   }
 
   const addQuestion = () => {
@@ -766,28 +944,58 @@ export default function QuizManager() {
                 </p>
               </div>
               
-              {timeLeft !== null && (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
+              <div style={{
+                display: 'flex',
+                gap: '24px',
+                alignItems: 'center'
+              }}>
+                {/* Score en temps réel pour les candidats */}
+                {session?.user.role === 'CANDIDAT' && (
                   <div style={{
-                    fontSize: '24px',
-                    fontWeight: '700',
-                    color: timeLeft < 300 ? '#ef4444' : '#10b981'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}>
-                    ⏱️ {formatTime(timeLeft)}
+                    <div style={{
+                      fontSize: '20px',
+                      fontWeight: '700',
+                      color: '#3b82f6'
+                    }}>
+                      📊 {currentScore.correct}/{currentScore.totalQuestions}
+                    </div>
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#9ca3af'
+                    }}>
+                      Bonnes réponses
+                    </div>
                   </div>
+                )}
+                
+                {timeLeft !== null && (
                   <div style={{
-                    fontSize: '14px',
-                    color: '#9ca3af'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px'
                   }}>
-                    Temps restant
+                    <div style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      color: timeLeft < 300 ? '#ef4444' : '#10b981'
+                    }}>
+                      ⏱️ {formatTime(timeLeft)}
+                    </div>
+                    <div style={{
+                      fontSize: '14px',
+                      color: '#9ca3af'
+                    }}>
+                      Temps restant
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Progress Bar */}
@@ -1059,7 +1267,7 @@ export default function QuizManager() {
                 marginBottom: '24px',
                 animation: 'modernPulse 2s ease-in-out infinite'
               }}>
-                {results.passed ? '🎉' : '😞'}
+                ✅
               </div>
 
               {/* Result Title */}
@@ -1067,36 +1275,32 @@ export default function QuizManager() {
                 ...modernDesign.typography.title,
                 fontSize: '32px',
                 marginBottom: '16px',
-                color: results.passed ? '#10b981' : '#ef4444'
+                color: '#3b82f6'
               }}>
-                {results.passed ? 'Félicitations !' : 'Quiz échoué'}
+                Quiz terminé
               </h2>
 
-              {/* Score Display */}
+              {/* Confirmation Message - Sans révéler le score */}
               <div style={{
                 ...modernDesign.glass.card,
                 padding: '24px',
                 marginBottom: '32px',
-                background: results.passed
-                  ? 'rgba(16, 185, 129, 0.1)'
-                  : 'rgba(239, 68, 68, 0.1)',
-                border: results.passed
-                  ? '1px solid rgba(16, 185, 129, 0.3)'
-                  : '1px solid rgba(239, 68, 68, 0.3)'
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                textAlign: 'center'
               }}>
                 <div style={{
-                  fontSize: '48px',
-                  fontWeight: '700',
-                  color: results.passed ? '#10b981' : '#ef4444',
+                  fontSize: '18px',
+                  color: '#ffffff',
                   marginBottom: '8px'
                 }}>
-                  {results.score}%
+                  Votre quiz a été soumis avec succès
                 </div>
                 <div style={{
                   fontSize: '16px',
                   color: '#d1d5db'
                 }}>
-                  Score requis: {activeQuiz?.passingScoreNormal}% (normal) / {activeQuiz?.passingScoreToWatch}% (à surveiller)
+                  Les résultats seront communiqués par l'équipe pédagogique
                 </div>
               </div>
 
@@ -1107,26 +1311,6 @@ export default function QuizManager() {
                 gap: '16px',
                 marginBottom: '32px'
               }}>
-                <div style={{
-                  ...modernDesign.glass.card,
-                  padding: '16px'
-                }}>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: '700',
-                    color: '#3b82f6',
-                    marginBottom: '4px'
-                  }}>
-                    {results.correctAnswers}
-                  </div>
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#9ca3af'
-                  }}>
-                    Bonnes réponses
-                  </div>
-                </div>
-                
                 <div style={{
                   ...modernDesign.glass.card,
                   padding: '16px'
@@ -1157,7 +1341,7 @@ export default function QuizManager() {
                     color: '#10b981',
                     marginBottom: '4px'
                   }}>
-                    {Math.floor((results.timeSpent || 0) / 60)}m
+                    {Math.floor((results.timeSpent || 0) / 60)}m {((results.timeSpent || 0) % 60)}s
                   </div>
                   <div style={{
                     fontSize: '14px',
@@ -1194,20 +1378,57 @@ export default function QuizManager() {
   return (
     <>
       {styles}
-      <div style={{
-        opacity: isLoaded ? 1 : 0,
-        transform: isLoaded ? 'translateY(0)' : 'translateY(20px)',
-        transition: 'all 0.6s ease-out'
-      }}>
-        {/* Modern Header */}
+      
+      {/* Vérification d'accès pour les candidats */}
+      {session?.user.role === 'CANDIDAT' && !interviewStatus.canAccessQuizzes && (
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          background: 'rgba(17, 24, 39, 0.8)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '20px',
+          padding: '48px',
           marginBottom: '32px',
-          padding: '24px 0',
-          position: 'relative'
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2)',
+          textAlign: 'center'
         }}>
+          <div style={{
+            fontSize: '64px',
+            marginBottom: '24px'
+          }}>🚫</div>
+          <h2 style={{
+            color: 'white',
+            fontSize: '24px',
+            fontWeight: '600',
+            marginBottom: '16px'
+          }}>Accès aux Quiz Restreint</h2>
+          <p style={{
+            color: '#9ca3af',
+            fontSize: '16px',
+            lineHeight: '1.6',
+            maxWidth: '500px',
+            margin: '0 auto'
+          }}>
+            {interviewStatus.message || 'Vous devez terminer votre entretien avant d\'accéder aux quiz.'}
+          </p>
+        </div>
+      )}
+      
+      {/* Contenu principal - affiché seulement si autorisé ou si admin */}
+      {(session?.user.role !== 'CANDIDAT' || interviewStatus.canAccessQuizzes) && (
+        <div style={{
+          opacity: isLoaded ? 1 : 0,
+          transform: isLoaded ? 'translateY(0)' : 'translateY(20px)',
+          transition: 'all 0.6s ease-out'
+        }}>
+          {/* Modern Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '32px',
+            padding: '24px 0',
+            position: 'relative'
+          }}>
           <div>
             <h1 style={{
               ...modernDesign.typography.title,
@@ -1240,7 +1461,7 @@ export default function QuizManager() {
           
           {isAdmin && (
             <button
-              onClick={() => setShowCreateForm(true)}
+              onClick={() => setShowCreateFormPersistent(true)}
               className="quiz-btn-primary"
               style={{
                 display: 'flex',
@@ -1588,7 +1809,7 @@ export default function QuizManager() {
                 justifyContent: 'flex-end'
               }}>
                 <button
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={() => setShowCreateFormPersistent(false)}
                   className="quiz-btn-secondary"
                   style={{
                     padding: '14px 28px'
@@ -2127,29 +2348,12 @@ export default function QuizManager() {
                     ? '1px solid rgba(16, 185, 129, 0.3)'
                     : '1px solid rgba(239, 68, 68, 0.3)'
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '8px'
-                  }}>
-                    <span style={{fontSize: '16px'}}>
-                      {quiz.attemptPassed ? '✅' : '❌'}
-                    </span>
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: quiz.attemptPassed ? '#10b981' : '#ef4444'
-                    }}>
-                      Dernier résultat: {quiz.attemptScore}%
-                    </span>
-                  </div>
                   <p style={{
                     margin: '0',
                     fontSize: '12px',
                     color: '#9ca3af'
                   }}>
-                    {quiz.attemptPassed ? 'Quiz réussi' : 'Quiz échoué'}
+                    Quiz terminé
                   </p>
                 </div>
               )}
@@ -2203,7 +2407,7 @@ export default function QuizManager() {
             </p>
             {isAdmin && (
               <button
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => setShowCreateFormPersistent(true)}
                 className="quiz-btn-primary"
                 style={{
                   padding: '16px 32px',
@@ -2279,19 +2483,17 @@ export default function QuizManager() {
                   }}>
                     <div style={{
                       ...modernDesign.badges.info,
-                      background: attempt.passed
-                        ? 'rgba(16, 185, 129, 0.2)'
-                        : 'rgba(239, 68, 68, 0.2)',
-                      color: attempt.passed ? '#10b981' : '#ef4444',
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#3b82f6',
                       fontSize: '14px',
                       fontWeight: '700'
                     }}>
-                      {attempt.score}%
+                      Terminé
                     </div>
                     <span style={{
                       fontSize: '20px'
                     }}>
-                      {attempt.passed ? '✅' : '❌'}
+                      ✓
                     </span>
                   </div>
                 </div>
@@ -2299,7 +2501,8 @@ export default function QuizManager() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </>
   )
 }
@@ -2416,18 +2619,18 @@ function QuizActionButtons({
                 </div>
               )}
             </button>
-            <button
-              onClick={handleRestartQuiz}
-              className="quiz-btn-secondary"
-              style={{
-                minWidth: '80px',
-                fontSize: '13px',
-                padding: '8px 12px'
-              }}
-              disabled={loading}
-            >
-              🔄 Recommencer
-            </button>
+            <div style={{
+              minWidth: '80px',
+              fontSize: '11px',
+              padding: '8px 12px',
+              color: '#9ca3af',
+              textAlign: 'center',
+              border: '1px solid #374151',
+              borderRadius: '8px',
+              background: 'rgba(17, 24, 39, 0.3)'
+            }}>
+              � Recommencer<br/>non autorisé
+            </div>
           </>
         ) : (
           <button

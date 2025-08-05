@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
           sessionId: registration.session.id,
           isActive: true,
           hasAttempt: !!existingAttempt,
-          attemptScore: existingAttempt?.score,
-          attemptPassed: existingAttempt ? existingAttempt.score >= sessionQuiz.quiz.passingScoreNormal : false,
+          attemptScore: existingAttempt ? Math.round((existingAttempt.score / existingAttempt.maxScore) * 100) : 0,
+          attemptPassed: existingAttempt ? (existingAttempt.score / existingAttempt.maxScore) * 100 >= sessionQuiz.quiz.passingScoreNormal : false,
           _count: sessionQuiz.quiz._count,
           questions: [] // Ne pas inclure les questions dans la liste
         }

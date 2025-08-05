@@ -136,22 +136,40 @@ export async function POST(request: NextRequest) {
         }
       })
     } else {
-      // Créer une nouvelle tentative
-      attempt = await prisma.quizAttempt.create({
-        data: {
+      // Créer une nouvelle tentative ou mettre à jour si existe déjà
+      // S'assurer que startTime est défini comme maintenant si pas fourni
+      const actualStartTime = startTime || currentTime
+      
+      attempt = await prisma.quizAttempt.upsert({
+        where: {
+          quizId_userId: {
+            quizId,
+            userId: session.user.id
+          }
+        },
+        create: {
           quizId,
           userId: session.user.id,
           sessionId: candidateSession.id,
           answers: {
             currentQuestionIndex,
             timeLeft,
-            startTime,
-            lastSaveTime: currentTime, // Ajouter le temps de dernière sauvegarde
+            startTime: actualStartTime,
+            lastSaveTime: currentTime,
             userAnswers: answers
           },
           score: 0,
           maxScore: 0,
           completed: false
+        },
+        update: {
+          answers: {
+            currentQuestionIndex,
+            timeLeft,
+            startTime: actualStartTime,
+            lastSaveTime: currentTime,
+            userAnswers: answers
+          }
         }
       })
     }

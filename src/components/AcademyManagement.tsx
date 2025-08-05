@@ -32,6 +32,7 @@ interface CandidateMonitoring {
     quizTitle: string
     completed: boolean
     score: number
+    correctAnswersPercentage: number
     completedAt: Date
     startedAt: Date
   }
@@ -61,11 +62,14 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
   const [showInterviewModal, setShowInterviewModal] = useState(false)
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateMonitoring | null>(null)
 
-  // Rafraîchissement automatique toutes les 10 secondes pour voir les nouveaux candidats et désinscriptions
+  // Rafraîchissement automatique plus fréquent pour une meilleure réactivité
   useEffect(() => {
     fetchCandidates()
-    const interval = setInterval(fetchCandidates, 10000)
-    return () => clearInterval(interval)
+    
+    // Rafraîchissement plus fréquent (2 secondes) pour avoir une mise à jour quasi-instantanée
+    const quickInterval = setInterval(fetchCandidates, 2000)
+    
+    return () => clearInterval(quickInterval)
   }, [sessionId])
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
@@ -124,18 +128,20 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
   }
 
   const resetQuiz = async (candidateId: string, quizId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir remettre à zéro ce quiz ?')) return
+    if (!confirm('Êtes-vous sûr de vouloir remettre à zéro toutes les tentatives de quiz pour ce candidat ? Cette action est irréversible.')) return
 
     try {
-      const response = await fetch(`/api/admin/candidates?candidateId=${candidateId}&quizId=${quizId}`, {
+      const response = await fetch(`/api/admin/candidates/quiz-reset?candidateId=${candidateId}&quizId=${quizId}`, {
         method: 'DELETE'
       })
 
       if (response.ok) {
+        const result = await response.json()
         await fetchCandidates()
-        showNotification('Quiz remis à zéro avec succès')
+        showNotification(`Quiz remis à zéro: ${result.message}`)
       } else {
-        showNotification('Erreur lors de la remise à zéro', 'error')
+        const error = await response.json()
+        showNotification(error.error || 'Erreur lors de la remise à zéro', 'error')
       }
     } catch (error) {
       console.error('Erreur:', error)
@@ -193,6 +199,16 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
       console.error('Erreur:', error)
       showNotification('Erreur réseau', 'error')
     }
+  }
+
+  const viewInterviewReport = (candidateId: string) => {
+    // Ouvrir le rapport d'entretien dans une nouvelle fenêtre ou modal
+    window.open(`/admin/interview-report/${candidateId}?sessionId=${sessionId}`, '_blank')
+  }
+
+  const viewQuizAnswers = (candidateId: string) => {
+    // Ouvrir les réponses du quiz dans une nouvelle fenêtre ou modal
+    window.open(`/admin/quiz-answers/${candidateId}?sessionId=${sessionId}`, '_blank')
   }
 
   const getStatusBadge = (candidate: CandidateMonitoring) => {
@@ -309,7 +325,7 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
     }
 
     // Si la décision d'entretien est défavorable
-    if (candidate.interviewDecision === 'DEFAVORABLE') {
+    if (candidate.interviewStatus?.decision === 'DEFAVORABLE') {
       return { canAccess: false, reason: 'Entretien défavorable' }
     }
 
@@ -941,13 +957,67 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
                     {/* Entretien */}
                     <td style={{ padding: '20px 24px' }}>
                       {candidate.interviewStatus?.completed ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <CheckCircle2 style={{ width: '16px', height: '16px', color: '#22c55e' }} />
-                          <span style={{ fontSize: '14px', color: 'white' }}>
-                            {candidate.interviewStatus.decision === 'FAVORABLE' && 'Favorable'}
-                            {candidate.interviewStatus.decision === 'A_SURVEILLER' && 'À surveiller'}
-                            {candidate.interviewStatus.decision === 'DEFAVORABLE' && 'Défavorable'}
-                          </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '200px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle2 style={{ width: '16px', height: '16px', color: '#22c55e' }} />
+                            <span style={{ fontSize: '14px', color: 'white' }}>
+                              {candidate.interviewStatus.decision === 'FAVORABLE' && 'Favorable'}
+                              {candidate.interviewStatus.decision === 'A_SURVEILLER' && 'À surveiller'}
+                              {candidate.interviewStatus.decision === 'DEFAVORABLE' && 'Défavorable'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => viewInterviewReport(candidate.candidateId)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 10px',
+                                fontSize: '11px',
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                color: '#3b82f6',
+                                borderRadius: '6px',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'
+                              }}
+                            >
+                              📋 Compte-rendu
+                            </button>
+                            {candidate.lastQuizAttempt && (
+                              <button
+                                onClick={() => viewQuizAnswers(candidate.candidateId)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '6px 10px',
+                                  fontSize: '11px',
+                                  background: 'rgba(139, 92, 246, 0.1)',
+                                  color: '#8b5cf6',
+                                  borderRadius: '6px',
+                                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)'
+                                }}
+                              >
+                                🧠 Quiz
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ) : candidate.interviewStatus?.inProgress ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1061,7 +1131,7 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
                             marginBottom: '4px'
                           }}>
                             <Clock style={{ width: '12px', height: '12px' }} />
-                            <span>Temps restant: {formatTime(candidate.activeQuiz.timeRemaining)}</span>
+                            <span>Débuté à: {new Date(candidate.activeQuiz.startedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                           <div style={{ fontSize: '12px', color: '#9ca3af' }}>
                             Score: {candidate.activeQuiz.currentScore} | 
@@ -1087,7 +1157,7 @@ export default function AcademyManagement({ sessionId, sessionName, sessionQuizz
                               <Clock style={{ width: '16px', height: '16px', color: '#fb923c' }} />
                             )}
                             <span style={{ fontSize: '14px', color: 'white' }}>
-                              Score: {candidate.lastQuizAttempt.score}
+                              {candidate.lastQuizAttempt.correctAnswersPercentage}% de bonnes réponses
                             </span>
                           </div>
                         </div>

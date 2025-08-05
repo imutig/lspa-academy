@@ -74,8 +74,14 @@ export default function InterviewModal({
       const questionsResponse = await fetch('/api/interview-questions')
       if (questionsResponse.ok) {
         const questionsData = await questionsResponse.json()
-        setQuestions(questionsData)
-        setQuestionAnswers(questionsData.map((q: Question) => ({ questionId: q.id, answer: '' })))
+        // Mélanger les questions de manière aléatoire avec l'algorithme Fisher-Yates
+        const shuffledQuestions = [...questionsData]
+        for (let i = shuffledQuestions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]]
+        }
+        setQuestions(shuffledQuestions)
+        setQuestionAnswers(shuffledQuestions.map((q: Question) => ({ questionId: q.id, answer: '' })))
       }
 
       // Récupérer 3 situations aléatoires

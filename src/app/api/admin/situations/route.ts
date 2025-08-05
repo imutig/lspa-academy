@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
       const count = parseInt(randomCount) || 3
       const situations = await prisma.$queryRaw`
         SELECT * FROM "Situation" 
-        WHERE "isActive" = true 
         ORDER BY RANDOM() 
         LIMIT ${count}
       `
@@ -48,10 +47,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
-    const { title, description, scenario, expectedResponse, difficulty, category, isActive } = await request.json()
+    const { title, description, expectedResponse, difficulty, category } = await request.json()
 
-    if (!title || !description || !scenario) {
-      return NextResponse.json({ error: 'Les champs titre, description et scénario sont requis' }, { status: 400 })
+    if (!title || !description) {
+      return NextResponse.json({ error: 'Les champs titre et description sont requis' }, { status: 400 })
     }
 
     const validDifficulties = ['FACILE', 'MOYEN', 'DIFFICILE']
@@ -63,11 +62,10 @@ export async function POST(request: NextRequest) {
       data: {
         title: title.trim(),
         description: description.trim(),
-        scenario: scenario.trim(),
         expectedResponse: expectedResponse?.trim() || null,
         difficulty: difficulty || 'MOYEN',
         category: category?.trim() || null,
-        isActive: isActive !== undefined ? isActive : true
+        createdBy: session.user.id
       }
     })
 

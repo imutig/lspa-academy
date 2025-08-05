@@ -6,9 +6,7 @@ import { useSession } from 'next-auth/react'
 interface InterviewQuestion {
   id: string
   question: string
-  expectedAnswers: string[]
   category: string
-  order: number
 }
 
 export default function InterviewQuestionManager() {
@@ -19,9 +17,7 @@ export default function InterviewQuestionManager() {
   const [editingQuestion, setEditingQuestion] = useState<InterviewQuestion | null>(null)
   const [formData, setFormData] = useState({
     question: '',
-    expectedAnswers: [''],
-    category: 'motivation',
-    order: 1
+    category: 'motivation'
   })
 
   const categories = [
@@ -42,7 +38,7 @@ export default function InterviewQuestionManager() {
       const response = await fetch('/api/interview-questions')
       if (response.ok) {
         const data = await response.json()
-        setQuestions(data.sort((a: InterviewQuestion, b: InterviewQuestion) => a.order - b.order))
+        setQuestions(data)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des questions:', error)
@@ -54,23 +50,25 @@ export default function InterviewQuestionManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.question || formData.expectedAnswers.some(answer => !answer.trim())) {
-      alert('Veuillez remplir tous les champs')
+    if (!formData.question) {
+      alert('Veuillez remplir la question')
       return
     }
 
     try {
+      let url = '/api/interview-questions'
       const method = editingQuestion ? 'PUT' : 'POST'
-      const body = editingQuestion 
-        ? { ...formData, id: editingQuestion.id }
-        : formData
+      
+      if (editingQuestion) {
+        url = `/api/interview-questions/${editingQuestion.id}`
+      }
 
-      const response = await fetch('/api/interview-questions', {
+      const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(formData)
       })
 
       if (response.ok) {
@@ -79,9 +77,7 @@ export default function InterviewQuestionManager() {
         setEditingQuestion(null)
         setFormData({
           question: '',
-          expectedAnswers: [''],
-          category: 'motivation',
-          order: 1
+          category: 'motivation'
         })
       } else {
         alert('Erreur lors de l\'enregistrement')
@@ -96,35 +92,29 @@ export default function InterviewQuestionManager() {
     setEditingQuestion(question)
     setFormData({
       question: question.question,
-      expectedAnswers: [...question.expectedAnswers],
-      category: question.category,
-      order: question.order
+      category: question.category
     })
     setShowForm(true)
   }
 
-  const addExpectedAnswer = () => {
-    setFormData(prev => ({
-      ...prev,
-      expectedAnswers: [...prev.expectedAnswers, '']
-    }))
-  }
+  const handleDelete = async (questionId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette question ?')) {
+      return
+    }
 
-  const updateExpectedAnswer = (index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      expectedAnswers: prev.expectedAnswers.map((answer, i) => 
-        i === index ? value : answer
-      )
-    }))
-  }
+    try {
+      const response = await fetch(`/api/interview-questions/${questionId}`, {
+        method: 'DELETE'
+      })
 
-  const removeExpectedAnswer = (index: number) => {
-    if (formData.expectedAnswers.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        expectedAnswers: prev.expectedAnswers.filter((_, i) => i !== index)
-      }))
+      if (response.ok) {
+        await fetchQuestions()
+      } else {
+        alert('Erreur lors de la suppression')
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error)
+      alert('Erreur lors de la suppression')
     }
   }
 
@@ -177,9 +167,7 @@ export default function InterviewQuestionManager() {
               setEditingQuestion(null)
               setFormData({
                 question: '',
-                expectedAnswers: [''],
-                category: 'motivation',
-                order: questions.length + 1
+                category: 'motivation'
               })
               setShowForm(true)
             }}
@@ -241,12 +229,6 @@ export default function InterviewQuestionManager() {
                   }}>
                     {categories.find(c => c.id === question.category)?.label || question.category}
                   </span>
-                  <span style={{
-                    color: '#9ca3af',
-                    fontSize: '12px'
-                  }}>
-                    Ordre: {question.order}
-                  </span>
                 </div>
                 
                 <h3 style={{
@@ -260,49 +242,43 @@ export default function InterviewQuestionManager() {
                 </h3>
                 
                 <div>
-                  <p style={{
-                    color: '#9ca3af',
-                    fontSize: '14px',
-                    margin: 0,
-                    marginBottom: '8px'
-                  }}>
-                    Réponses attendues :
-                  </p>
-                  <ul style={{
-                    margin: 0,
-                    paddingLeft: '20px'
-                  }}>
-                    {question.expectedAnswers.map((answer, index) => (
-                      <li
-                        key={index}
-                        style={{
-                          color: '#d1d5db',
-                          fontSize: '14px',
-                          marginBottom: '4px'
-                        }}
-                      >
-                        {answer}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               </div>
               
               {['DIRECTEUR', 'SUPERVISEUR'].includes(session?.user?.role || '') && (
-                <button
-                  onClick={() => handleEdit(question)}
-                  style={{
-                    padding: '8px 16px',
-                    background: 'rgba(168, 85, 247, 0.2)',
-                    border: '1px solid rgba(168, 85, 247, 0.5)',
-                    borderRadius: '6px',
-                    color: '#a855f7',
-                    fontSize: '14px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✏️ Modifier
-                </button>
+                <div style={{
+                  display: 'flex',
+                  gap: '8px'
+                }}>
+                  <button
+                    onClick={() => handleEdit(question)}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'rgba(168, 85, 247, 0.2)',
+                      border: '1px solid rgba(168, 85, 247, 0.5)',
+                      borderRadius: '6px',
+                      color: '#a855f7',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    onClick={() => handleDelete(question.id)}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid rgba(239, 68, 68, 0.5)',
+                      borderRadius: '6px',
+                      color: '#ef4444',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🗑️ Supprimer
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -403,107 +379,7 @@ export default function InterviewQuestionManager() {
                 </select>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'block',
-                  color: 'white',
-                  fontSize: '16px',
-                  fontWeight: '500',
-                  marginBottom: '8px'
-                }}>
-                  Ordre :
-                </label>
-                <input
-                  type="number"
-                  value={formData.order}
-                  onChange={(e) => setFormData(prev => ({ ...prev, order: parseInt(e.target.value) || 1 }))}
-                  min={1}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: 'rgba(31, 41, 55, 0.8)',
-                    border: '1px solid rgba(75, 85, 99, 0.5)',
-                    borderRadius: '8px',
-                    color: 'white',
-                    fontSize: '16px'
-                  }}
-                />
-              </div>
-
               <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px'
-                }}>
-                  <label style={{
-                    color: 'white',
-                    fontSize: '16px',
-                    fontWeight: '500'
-                  }}>
-                    Réponses attendues :
-                  </label>
-                  <button
-                    type="button"
-                    onClick={addExpectedAnswer}
-                    style={{
-                      padding: '6px 12px',
-                      background: 'rgba(34, 197, 94, 0.2)',
-                      border: '1px solid rgba(34, 197, 94, 0.5)',
-                      borderRadius: '6px',
-                      color: '#22c55e',
-                      fontSize: '14px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    + Ajouter
-                  </button>
-                </div>
-                
-                {formData.expectedAnswers.map((answer, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      display: 'flex',
-                      gap: '8px',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    <input
-                      type="text"
-                      value={answer}
-                      onChange={(e) => updateExpectedAnswer(index, e.target.value)}
-                      placeholder={`Réponse ${index + 1}...`}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        background: 'rgba(31, 41, 55, 0.8)',
-                        border: '1px solid rgba(75, 85, 99, 0.5)',
-                        borderRadius: '6px',
-                        color: 'white',
-                        fontSize: '14px'
-                      }}
-                      required
-                    />
-                    {formData.expectedAnswers.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeExpectedAnswer(index)}
-                        style={{
-                          padding: '8px',
-                          background: 'rgba(239, 68, 68, 0.2)',
-                          border: '1px solid rgba(239, 68, 68, 0.5)',
-                          borderRadius: '6px',
-                          color: '#ef4444',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
               </div>
 
               <div style={{

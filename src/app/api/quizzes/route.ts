@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
       timeLimit: quiz.timeLimit,
       passingScoreNormal: quiz.passingScoreNormal,
       passingScoreToWatch: quiz.passingScoreToWatch,
-      questionCount: quiz.questions.length,
+      _count: {
+        questions: quiz.questions.length
+      },
       sessions: quiz.sessionQuizzes.map(sq => ({
         id: sq.session.id,
         name: sq.session.name,

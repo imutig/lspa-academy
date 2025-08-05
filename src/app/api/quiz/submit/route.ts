@@ -88,8 +88,23 @@ export async function POST(request: NextRequest) {
     let earnedPoints = 0
 
     const results = quiz.questions.map((question: any) => {
-      const userAnswer = answers[question.id]
-      const isCorrect = userAnswer === question.correctAnswer
+      const userAnswerIndexRaw = answers[question.id]
+      // Convertir en number si c'est une string
+      const userAnswerIndex = typeof userAnswerIndexRaw === 'string' ? parseInt(userAnswerIndexRaw, 10) : userAnswerIndexRaw
+      const correctAnswer = question.correctAnswer
+      
+      // Parse les options pour trouver le texte de la réponse utilisateur
+      const options = JSON.parse(question.options)
+      
+      let isCorrect = false
+      
+      if (userAnswerIndex !== null && userAnswerIndex !== undefined && !isNaN(userAnswerIndex) && options[userAnswerIndex]) {
+        // L'utilisateur envoie l'index (0, 1, 2, 3)
+        // La correctAnswer est stockée comme le texte de la bonne réponse
+        const userAnswerText = options[userAnswerIndex].text
+        isCorrect = userAnswerText === correctAnswer
+      }
+      
       totalPoints += question.points
       if (isCorrect) {
         earnedPoints += question.points
@@ -97,7 +112,7 @@ export async function POST(request: NextRequest) {
 
       return {
         questionId: question.id,
-        userAnswer,
+        userAnswer: userAnswerIndex !== null && userAnswerIndex !== undefined && !isNaN(userAnswerIndex) ? options[userAnswerIndex]?.text : null,
         correctAnswer: question.correctAnswer,
         isCorrect,
         points: isCorrect ? question.points : 0
@@ -126,8 +141,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Sauvegarder la tentative
-    const attempt = await prisma.quizAttempt.create({
-      data: {
+    const attempt = await prisma.quizAttempt.upsert({
+      where: {
+        quizId_userId: {
+          quizId,
+          userId: session.user.id
+        }
+      },
+      update: {
+        answers: answers,
+        score: earnedPoints,
+        maxScore: totalPoints,
+        completed: true,
+        completedAt: new Date()
+      },
+      create: {
         quizId,
         userId: session.user.id,
         sessionId: candidateSession.id,
@@ -156,8 +184,13 @@ export async function POST(request: NextRequest) {
         correctAnswers: results.filter((r: any) => r.isCorrect).length,
         score: earnedPoints,
         maxScore: totalPoints,
-        passed: earnedPoints >= (quiz.passingScoreNormal || 80)
-      }
+        scorePercentage,
+        passed: scorePercentage >= (quiz.passingScoreNormal || 80)
+      },
+      // Pour l'affichage dans l'interface candidate (sans révéler le vrai score)
+      correctAnswers: results.filter((r: any) => r.isCorrect).length,
+      timeSpent,
+      passed: scorePercentage >= (quiz.passingScoreNormal || 80)
     })
   } catch (error) {
     console.error('Erreur lors de la soumission du quiz:', error)

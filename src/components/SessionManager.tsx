@@ -192,6 +192,25 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
     }
   }
 
+  const handleToggleQuizActivation = async (sessionQuizId: string, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`/api/session-quizzes/${sessionQuizId}/toggle`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          isActive: !currentStatus
+        })
+      })
+      
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour')
+      fetchSessionQuizzes(selectedSession)
+    } catch (err) {
+      setError('Impossible de changer le statut du quiz')
+    }
+  }
+
   const canManageSessions = ['SUPERVISEUR', 'DIRECTEUR'].includes(userRole)
 
   const handleManageQuizzes = (sessionId: string) => {
@@ -214,6 +233,11 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
   const handleViewInterviewReport = (candidateId: string, sessionId: string) => {
     // Redirection vers la page d'entretien en mode consultation
     window.open(`/admin/interview?candidateId=${candidateId}&sessionId=${sessionId}&mode=view`, '_blank')
+  }
+
+  const handleViewCandidateQuizzes = (candidateId: string, sessionId: string) => {
+    // Redirection vers une nouvelle page pour voir les quiz du candidat
+    window.open(`/admin/candidate-quizzes?candidateId=${candidateId}&sessionId=${sessionId}`, '_blank')
   }
 
   // Global styles for the entire component
@@ -1044,7 +1068,7 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
                     <option value="">Choisir un quiz...</option>
                     {availableQuizzes.map((quiz) => (
                       <option key={quiz.id} value={quiz.id}>
-                        {quiz.title} ({quiz._count.questions} questions)
+                        {quiz.title} ({quiz._count?.questions || 0} questions)
                       </option>
                     ))}
                   </select>
@@ -1158,33 +1182,83 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
                               fontSize: '14px',
                               color: '#9ca3af'
                             }}>
-                              {sessionQuiz.quiz._count.questions} questions
+                              {sessionQuiz.quiz._count?.questions || 0} questions
+                              {sessionQuiz.isActive && (
+                                <span style={{
+                                  marginLeft: '8px',
+                                  padding: '2px 6px',
+                                  backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                                  color: '#22c55e',
+                                  fontSize: '12px',
+                                  borderRadius: '4px',
+                                  fontWeight: '500'
+                                }}>
+                                  Actif
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
                         
-                        <button
-                          onClick={() => handleUnassignQuiz(sessionQuiz.id)}
-                          style={{
-                            ...modernDesign.buttons.secondary,
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            color: '#fca5a5',
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          🗑️ Retirer
-                        </button>
+                        <div style={{
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'center'
+                        }}>
+                          <button
+                            onClick={() => handleToggleQuizActivation(sessionQuiz.id, sessionQuiz.isActive)}
+                            style={{
+                              ...modernDesign.buttons.secondary,
+                              background: sessionQuiz.isActive 
+                                ? 'rgba(251, 146, 60, 0.1)' 
+                                : 'rgba(34, 197, 94, 0.1)',
+                              border: sessionQuiz.isActive 
+                                ? '1px solid rgba(251, 146, 60, 0.3)' 
+                                : '1px solid rgba(34, 197, 94, 0.3)',
+                              color: sessionQuiz.isActive ? '#fb923c' : '#22c55e',
+                              padding: '8px 16px',
+                              fontSize: '14px',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = sessionQuiz.isActive 
+                                ? 'rgba(251, 146, 60, 0.2)' 
+                                : 'rgba(34, 197, 94, 0.2)';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = sessionQuiz.isActive 
+                                ? 'rgba(251, 146, 60, 0.1)' 
+                                : 'rgba(34, 197, 94, 0.1)';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            {sessionQuiz.isActive ? '⏸️ Désactiver' : '▶️ Activer'}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleUnassignQuiz(sessionQuiz.id)}
+                            style={{
+                              ...modernDesign.buttons.secondary,
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#fca5a5',
+                              padding: '8px 16px',
+                              fontSize: '14px',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            🗑️ Retirer
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1478,33 +1552,63 @@ export default function SessionManager({ userRole }: SessionManagerProps) {
                           minWidth: '200px'
                         }}>
                           {candidate.interview && candidate.interview.status === 'COMPLETED' ? (
-                            <button
-                              onClick={() => handleViewInterviewReport(candidate.id, selectedSession)}
-                              style={{
-                                ...modernDesign.buttons.secondary,
-                                background: 'rgba(16, 185, 129, 0.1)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                color: '#6ee7b7',
-                                padding: '10px 16px',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                justifyContent: 'center',
-                                transition: 'all 0.3s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
-                                e.currentTarget.style.transform = 'scale(1.05)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                                e.currentTarget.style.transform = 'scale(1)';
-                              }}
-                            >
-                              <span style={{fontSize: '16px'}}>📄</span>
-                              <span>Voir le compte-rendu</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleViewInterviewReport(candidate.id, selectedSession)}
+                                style={{
+                                  ...modernDesign.buttons.secondary,
+                                  background: 'rgba(16, 185, 129, 0.1)',
+                                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                                  color: '#6ee7b7',
+                                  padding: '10px 16px',
+                                  fontSize: '14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.3s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                <span style={{fontSize: '16px'}}>📄</span>
+                                <span>Voir le compte-rendu</span>
+                              </button>
+                              
+                              <button
+                                onClick={() => handleViewCandidateQuizzes(candidate.id, selectedSession)}
+                                style={{
+                                  ...modernDesign.buttons.secondary,
+                                  background: 'rgba(139, 92, 246, 0.1)',
+                                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                                  color: '#c4b5fd',
+                                  padding: '10px 16px',
+                                  fontSize: '14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.3s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                <span style={{fontSize: '16px'}}>📝</span>
+                                <span>Voir les quiz</span>
+                              </button>
+                            </>
                           ) : (
                             <button
                               onClick={() => handleConductInterview(candidate.id, selectedSession)}

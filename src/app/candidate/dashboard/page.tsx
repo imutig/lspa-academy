@@ -21,6 +21,12 @@ export default function CandidateDashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [interviewStatus, setInterviewStatus] = useState({
+    canAccessQuizzes: false,
+    interviewStatus: 'NONE',
+    lastInterview: null,
+    message: null as string | null
+  })
 
   // Color mapping helper
   const getColorRgb = (color: string) => {
@@ -35,6 +41,22 @@ export default function CandidateDashboard() {
     return colorMap[color] || '59, 130, 246'
   }
 
+  // Fonction pour ouvrir le compte-rendu d'entretien
+  const handleViewInterviewReport = async () => {
+    try {
+      const response = await fetch('/api/candidate/interview-report')
+      if (response.ok) {
+        const data = await response.json()
+        // Ouvrir dans un nouvel onglet ou afficher dans une modal
+        window.open(`/candidate/interview-report`, '_blank')
+      } else {
+        console.error('Erreur lors de la récupération du compte-rendu')
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+    }
+  }
+
   useEffect(() => {
     setIsLoaded(true)
     
@@ -44,9 +66,18 @@ export default function CandidateDashboard() {
     const quizId = urlParams.get('quizId')
     
     if (activeTabParam === 'quiz' && quizId) {
+      // Ne permettre l'accès direct au quiz que si autorisé
+      // La vérification sera faite une fois que les données sont chargées
       setActiveTab('quiz')
     }
   }, [])
+
+  // Vérifier l'accès aux quiz après chargement des données
+  useEffect(() => {
+    if (!loading && activeTab === 'quiz' && !interviewStatus.canAccessQuizzes) {
+      setActiveTab('sessions') // Rediriger vers l'onglet sessions avec le message d'info
+    }
+  }, [loading, activeTab, interviewStatus.canAccessQuizzes])
 
   useEffect(() => {
     if (status === "loading") return
@@ -57,13 +88,19 @@ export default function CandidateDashboard() {
     }
 
     fetchData()
+    
+    // Rafraîchissement automatique toutes les 3 secondes pour voir instantanément les changements d'inscription
+    const interval = setInterval(fetchData, 3000)
+    
+    return () => clearInterval(interval)
   }, [session, status, router])
 
   const fetchData = async () => {
     try {
       // Récupérer les vraies données depuis l'API
-      const [registrationsRes] = await Promise.all([
-        fetch('/api/candidate/registrations')
+      const [registrationsRes, interviewStatusRes] = await Promise.all([
+        fetch('/api/candidate/registrations'),
+        fetch('/api/candidate/interview-status')
       ])
 
       if (registrationsRes.ok) {
@@ -81,6 +118,11 @@ export default function CandidateDashboard() {
           completedQuizzes: 0,
           totalScore: 0
         })
+      }
+
+      if (interviewStatusRes.ok) {
+        const statusData = await interviewStatusRes.json()
+        setInterviewStatus(statusData)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
@@ -134,7 +176,7 @@ export default function CandidateDashboard() {
   const tabs = [
     { id: 'overview', label: 'Vue d\'ensemble', icon: '📊' },
     { id: 'sessions', label: 'Mes Sessions', icon: '📚' },
-    { id: 'quizzes', label: 'Quiz', icon: '📝' },
+    ...(interviewStatus.canAccessQuizzes ? [{ id: 'quizzes', label: 'Quiz', icon: '📝' }] : []),
   ]
 
   const statCards = [
@@ -342,6 +384,31 @@ export default function CandidateDashboard() {
                   ))}
                 </div>
 
+                {/* Actions rapides */}
+                {interviewStatus.canAccessQuizzes && (
+                  <div style={{
+                    background: 'rgba(17, 24, 39, 0.7)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(75, 85, 99, 0.3)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    marginBottom: '32px'
+                  }}>
+                    <h3 style={{
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      marginBottom: '24px'
+                    }}>Informations Importantes</h3>
+                    <p style={{
+                      color: '#9ca3af',
+                      lineHeight: '1.6'
+                    }}>
+                      Suivez votre progression à travers les différentes étapes de votre candidature LSPA.
+                    </p>
+                  </div>
+                )}
+
                 {/* Vue d'ensemble */}
                 <div style={{
                   display: 'grid',
@@ -429,6 +496,48 @@ export default function CandidateDashboard() {
             {activeTab === 'sessions' && (
               <div style={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
                 <CandidateSessionList />
+                
+                {/* Message d'information pour l'accès aux quiz */}
+                {!interviewStatus.canAccessQuizzes && interviewStatus.message && (
+                  <div style={{
+                    background: 'rgba(17, 24, 39, 0.8)',
+                    backdropFilter: 'blur(20px)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      marginBottom: '16px'
+                    }}>
+                      <div style={{
+                        padding: '12px',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(59, 130, 246, 0.2)'
+                      }}>
+                        📝
+                      </div>
+                      <h3 style={{
+                        color: 'white',
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        margin: 0
+                      }}>Accès aux Quiz</h3>
+                    </div>
+                    <p style={{
+                      color: '#9ca3af',
+                      fontSize: '14px',
+                      margin: 0,
+                      lineHeight: '1.6'
+                    }}>
+                      {interviewStatus.message}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

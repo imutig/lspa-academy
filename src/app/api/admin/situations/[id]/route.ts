@@ -15,10 +15,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
-    const { title, description, scenario, expectedResponse, difficulty, category, isActive } = await request.json()
+    const { title, description, expectedResponse, correctAnswer, difficulty, category } = await request.json()
 
-    if (!title || !description || !scenario) {
-      return NextResponse.json({ error: 'Les champs titre, description et scénario sont requis' }, { status: 400 })
+    if (!title || !description) {
+      return NextResponse.json({ error: 'Les champs titre et description sont requis' }, { status: 400 })
     }
 
     const validDifficulties = ['FACILE', 'MOYEN', 'DIFFICILE']
@@ -31,11 +31,10 @@ export async function PUT(
       data: {
         title: title.trim(),
         description: description.trim(),
-        scenario: scenario.trim(),
         expectedResponse: expectedResponse?.trim() || null,
+        correctAnswer: correctAnswer?.trim() || null,
         difficulty: difficulty || 'MOYEN',
-        category: category?.trim() || null,
-        isActive: isActive !== undefined ? isActive : true
+        category: category?.trim() || null
       }
     })
 

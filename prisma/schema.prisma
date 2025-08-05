@@ -107,6 +107,7 @@ model Interview {
   interviewQuestions  InterviewQuestion[]
   interviewSituations InterviewSituation[]
 
+  @@unique([sessionId, candidateId])
   @@map("interviews")
 }
 
